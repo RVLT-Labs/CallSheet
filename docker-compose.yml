@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: callsheet
+      POSTGRES_PASSWORD: callsheet
+      POSTGRES_DB: callsheet
+    ports:
+      - "5432:5432"
+    volumes:
+      - callsheet-postgres:/var/lib/postgresql/data
+
+volumes:
+  callsheet-postgres:

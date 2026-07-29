@@ -1,0 +1,302 @@
+// Prisma schema for Callsheet.
+// Auth tables (User, Session, Account, Verification, Organization, Member, Invitation)
+// follow Better Auth's expected shape exactly — see node_modules/better-auth core/organization
+// schema source, not the docs, since field names must match precisely for the adapter to work.
+// Film = Organization, Membership = Member (Better Auth's Organization plugin), per spec §4.1.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Better Auth core ----------
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  name          String
+  image         String?
+  phone         String? // day-of contact only, never used for auth (spec §4.2a)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions Session[]
+  accounts Account[]
+  members  Member[]
+}
+
+model Session {
+  id                   String   @id @default(cuid())
+  userId               String
+  expiresAt            DateTime
+  token                String   @unique
+  ipAddress            String?
+  userAgent            String?
+  activeOrganizationId String? // added by the organization plugin
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  providerId            String
+  accountId             String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+// ---------- Better Auth organization plugin (Film = Organization) ----------
+
+enum FilmStatus {
+  active
+  wrapped
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logo      String?
+  metadata  String?
+  createdAt DateTime @default(now())
+
+  // additionalFields — film-specific data per spec §4.2 / §6, not a parallel Film table
+  dateRangeStart          DateTime?
+  dateRangeEnd            DateTime?
+  posterUrl               String?
+  status                  FilmStatus @default(active)
+  showTentativeToCrew     Boolean    @default(false)
+  showCrewContactsToCrew  Boolean    @default(false)
+  showAvailabilityToCrew  Boolean    @default(false)
+
+  members     Member[]
+  invitations Invitation[]
+  shoots      Shoot[]
+
+  @@map("organization")
+}
+
+model Member {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  role           String   @default("member") // organiser | member — auth permission role, not a job-function role tag
+  createdAt      DateTime @default(now())
+
+  // additionalFields
+  roleTags String[] @default([]) // job-function tags (Camera, Sound, ...) — cheap to capture pre-Phase-2 per spec §4.2
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  availability     Availability[]
+  recurringRules   RecurringAvailabilityRule[]
+  shootInvites     ShootInvite[]
+  requiredOnSlots  ShootSlot[]
+
+  @@unique([organizationId, userId])
+  @@map("member")
+}
+
+model Invitation {
+  id             String   @id @default(cuid())
+  organizationId String
+  email          String
+  role           String?
+  status         String   @default("pending")
+  expiresAt      DateTime
+  inviterId      String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("invitation")
+}
+
+// ---------- Availability (spec §4.3, §6) ----------
+
+enum HalfDay {
+  AM
+  PM
+}
+
+enum AvailabilityTier {
+  best
+  ok
+  unavailable
+}
+
+enum AvailabilitySource {
+  manual
+  recurring
+}
+
+model Availability {
+  id           String             @id @default(cuid())
+  membershipId String
+  date         DateTime           @db.Date
+  halfDay      HalfDay
+  tier         AvailabilityTier
+  source       AvailabilitySource @default(manual)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  membership Member @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  // one tier per person/date/half-day — manual entries overwrite in place rather than stacking rows
+  @@unique([membershipId, date, halfDay])
+  @@index([membershipId])
+}
+
+// A recurring rule generates/refreshes Availability rows with source = recurring.
+// A manual Availability row on a matching date always takes precedence (spec §10).
+model RecurringAvailabilityRule {
+  id              String           @id @default(cuid())
+  membershipId    String
+  dayOfWeek       Int // 0 (Sunday) - 6 (Saturday)
+  halfDay         HalfDay? // null = both AM and PM
+  tier            AvailabilityTier
+  label           String?
+  effectiveStart  DateTime         @db.Date
+  effectiveEnd    DateTime?        @db.Date // defaults to the film's working window when unset
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  membership Member @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@index([membershipId])
+}
+
+// ---------- Shoots (spec §4.5, §4.6, §4.7, §6) ----------
+
+enum ShootStatus {
+  tentative
+  confirmed
+}
+
+model Shoot {
+  id              String      @id @default(cuid())
+  filmId          String
+  status          ShootStatus @default(tentative)
+  locationAddress String?
+  locationMapUrl  String?
+  locationNotes   String? // parking, nearest hospital, etc — free text for now (spec §4.6)
+  notes           String?
+  icsUid          String      @unique @default(cuid()) // stable across edits so calendar apps update, not duplicate
+  icsSequence     Int         @default(0) // incremented on every confirmed-shoot time/location change (spec §4.6)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  film    Organization  @relation(fields: [filmId], references: [id], onDelete: Cascade)
+  days    ShootDay[]
+  slots   ShootSlot[]
+  invites ShootInvite[]
+
+  @@index([filmId])
+}
+
+model ShootDay {
+  id              String   @id @default(cuid())
+  shootId         String
+  date            DateTime @db.Date
+  halfDay         HalfDay
+  defaultCallTime String // "HH:mm", kept as a plain string — no timezone math needed within one shoot's local call time
+
+  shoot            Shoot              @relation(fields: [shootId], references: [id], onDelete: Cascade)
+  callTimeOverride CallTimeOverride[]
+
+  @@unique([shootId, date, halfDay])
+}
+
+enum ShootSlotKind {
+  required
+  general
+}
+
+// A slot is either a real Member (membershipId set) or a placeholder (placeholderLabel set, membershipId null).
+// Required slots hard-block candidate dates in the suggestion algorithm; general slots never do (spec §4.5).
+model ShootSlot {
+  id               String        @id @default(cuid())
+  shootId          String
+  kind             ShootSlotKind
+  membershipId     String?
+  placeholderLabel String? // e.g. "TBD Boom Op" — used when membershipId is null
+
+  shoot      Shoot   @relation(fields: [shootId], references: [id], onDelete: Cascade)
+  membership Member? @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@index([shootId])
+  @@index([membershipId])
+}
+
+enum InviteStatus {
+  pending
+  accepted
+  declined
+}
+
+model ShootInvite {
+  id                 String       @id @default(cuid())
+  shootId            String
+  membershipId       String
+  status             InviteStatus @default(pending)
+  token              String       @unique // signed/random token for no-login accept/decline links (spec §7)
+  sentAt             DateTime?
+  respondedAt        DateTime?
+  lastReminderSentAt DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  shoot            Shoot              @relation(fields: [shootId], references: [id], onDelete: Cascade)
+  membership       Member             @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  callTimeOverride CallTimeOverride[]
+
+  @@unique([shootId, membershipId])
+  @@index([membershipId])
+}
+
+// Per-person, per-day call time override (spec §4.6) — falls back to ShootDay.defaultCallTime when absent.
+model CallTimeOverride {
+  id            String @id @default(cuid())
+  shootInviteId String
+  shootDayId    String
+  callTime      String // "HH:mm"
+
+  shootInvite ShootInvite @relation(fields: [shootInviteId], references: [id], onDelete: Cascade)
+  shootDay    ShootDay    @relation(fields: [shootDayId], references: [id], onDelete: Cascade)
+
+  @@unique([shootInviteId, shootDayId])
+}
