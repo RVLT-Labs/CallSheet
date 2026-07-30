@@ -1,8 +1,9 @@
-import { AvailabilityGrid } from "@/components/availability/availability-grid";
+import { AvailabilityGrid, type ShootFilterOption } from "@/components/availability/availability-grid";
 import { NavShell } from "@/components/ui/nav-shell";
 import { PageShell } from "@/components/ui/page-shell";
 import { getAggregateAvailability } from "@/server/availability-grid";
 import { requireActiveOrganiserFilm } from "@/server/organiser";
+import { getFilmShoots } from "@/server/shoots-list";
 
 export default async function AvailabilityGridPage({
   searchParams,
@@ -30,7 +31,24 @@ export default async function AvailabilityGridPage({
     );
   }
 
-  const crew = await getAggregateAvailability(film.id, film.dateRangeStart, film.dateRangeEnd);
+  const [crew, filmShoots] = await Promise.all([
+    getAggregateAvailability(film.id, film.dateRangeStart, film.dateRangeEnd),
+    getFilmShoots(film.id),
+  ]);
+
+  const shoots: ShootFilterOption[] = filmShoots.map((shoot) => {
+    const dateIsos = [...new Set(shoot.days.map((d) => d.date.toISOString().slice(0, 10)))].sort();
+    const activeSlots = shoot.slots.filter((s) => !s.removedAt);
+    return {
+      id: shoot.id,
+      label: shoot.title ?? (dateIsos.length === 1 ? dateIsos[0] : `${dateIsos[0]} – ${dateIsos[dateIsos.length - 1]}`),
+      status: shoot.status,
+      dateIsos,
+      requiredMembershipIds: activeSlots
+        .filter((s) => s.kind === "required" && s.membershipId)
+        .map((s) => s.membershipId as string),
+    };
+  });
 
   return (
     <NavShell
@@ -49,6 +67,7 @@ export default async function AvailabilityGridPage({
           windowStart={film.dateRangeStart.toISOString().slice(0, 10)}
           windowEnd={film.dateRangeEnd.toISOString().slice(0, 10)}
           requiredMembershipIds={requiredMembershipIds}
+          shoots={shoots}
         />
       </PageShell>
     </NavShell>
