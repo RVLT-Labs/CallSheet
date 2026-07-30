@@ -18,7 +18,7 @@ export default async function SettingsPage() {
   if (!isOrganiser) redirect("/");
 
   return (
-    <NavShell activeHref="/settings">
+    <NavShell activeHref="/settings" user={{ name: session.user.name }}>
       <CenteredCard wide>
         <h1 className="font-display mb-5 text-2xl font-bold italic text-burgundy">{film.name} settings</h1>
         <FilmSettingsForm film={film} organisers={organisers} currentUserId={session.user.id} />

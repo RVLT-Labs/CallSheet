@@ -27,7 +27,7 @@ export default async function AvailabilityPage() {
 
   if (!film.dateRangeStart || !film.dateRangeEnd) {
     return (
-      <NavShell activeHref="/availability">
+      <NavShell activeHref="/availability" user={{ name: session.user.name }}>
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
           <p className="font-display text-xl font-bold italic text-burgundy">No working dates yet</p>
           <p className="max-w-sm text-sm text-ink-soft">
@@ -46,7 +46,7 @@ export default async function AvailabilityPage() {
   );
 
   return (
-    <NavShell activeHref="/availability">
+    <NavShell activeHref="/availability" user={{ name: session.user.name }}>
       <PageShell maxWidth="max-w-5xl">
         <div className="mb-6 flex items-baseline justify-between">
           <div>

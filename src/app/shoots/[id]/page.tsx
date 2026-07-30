@@ -73,7 +73,7 @@ export default async function ShootDetailPage({ params }: { params: Promise<{ id
   };
 
   return (
-    <NavShell activeHref="/shoots">
+    <NavShell activeHref="/shoots" user={{ name: session.user.name }}>
       <ShootDetailView shoot={data} isOrganiser={isOrganiser} />
     </NavShell>
   );

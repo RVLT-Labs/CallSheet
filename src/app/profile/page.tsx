@@ -17,7 +17,7 @@ export default async function ProfilePage() {
   );
 
   return (
-    <NavShell activeHref="/profile">
+    <NavShell activeHref="/profile" user={{ name: user.name }}>
       <CenteredCard wide>
         <h1 className="mb-5 text-base font-bold">Your profile</h1>
         <ProfileForm name={user.name} phone={user.phone} membership={membership} />

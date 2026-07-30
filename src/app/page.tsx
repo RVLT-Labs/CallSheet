@@ -27,7 +27,7 @@ export default async function Home() {
 
   if (!activeFilm) {
     return (
-      <NavShell activeHref="/">
+      <NavShell activeHref="/" user={{ name: session.user.name }}>
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
           <FilmPicker
             active={active}
@@ -56,7 +56,7 @@ export default async function Home() {
     const upcoming = await getOrganiserUpcomingShoots(film.id);
 
     return (
-      <NavShell activeHref="/">
+      <NavShell activeHref="/" user={{ name: session.user.name }}>
         <OrganiserDashboard filmName={film.name} upcoming={upcoming} />
         <AutoRefresh />
       </NavShell>
@@ -69,7 +69,7 @@ export default async function Home() {
   const { upcoming } = await getMyShootsData(membership.id, film.id, film.showTentativeToCrew);
 
   return (
-    <NavShell activeHref="/">
+    <NavShell activeHref="/" user={{ name: session.user.name }}>
       <CrewToday filmName={film.name} upcoming={upcoming.slice(0, 5)} />
     </NavShell>
   );

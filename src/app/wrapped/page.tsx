@@ -29,7 +29,7 @@ export default async function WrappedPage() {
   const { shootsCount, crewCount, acceptanceRate } = await getWrapSummary(organizationId);
 
   return (
-    <NavShell activeHref="/wrapped">
+    <NavShell activeHref="/wrapped" user={{ name: session.user.name }}>
       <div className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center px-6 py-16 text-center">
         <p className="mb-1 text-[13px] text-ink-soft">{film.name}</p>
         <h1 className="font-display mb-2 text-3xl font-bold italic text-burgundy">That&apos;s a wrap.</h1>

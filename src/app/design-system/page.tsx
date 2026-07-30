@@ -211,8 +211,8 @@ export default function DesignSystemPage() {
       <section className="mb-16">
         <SectionTitle>07 · Navigation</SectionTitle>
         <div className="max-w-sm overflow-hidden rounded-md border border-hairline md:max-w-full">
-          <BottomTabBar items={DEFAULT_NAV_ITEMS} activeHref="/" />
-          <TopNav items={DEFAULT_NAV_ITEMS} activeHref="/" />
+          <BottomTabBar items={DEFAULT_NAV_ITEMS} activeHref="/" user={{ name: "Jordan" }} />
+          <TopNav items={DEFAULT_NAV_ITEMS} activeHref="/" user={{ name: "Jordan" }} />
         </div>
         <p className="mt-2.5 max-w-[620px] text-xs leading-relaxed text-ink-soft">
           Resize the viewport: below <code>md</code> renders <code>BottomTabBar</code>, at{" "}
