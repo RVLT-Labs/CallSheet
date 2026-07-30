@@ -1,4 +1,4 @@
-import { betterAuth } from "better-auth";
+import { betterAuth, getBaseURL } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { organization, magicLink } from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
@@ -59,7 +59,18 @@ export const auth = betterAuth({
         },
       },
       sendInvitationEmail: async (data) => {
-        const url = `${process.env.BETTER_AUTH_URL ?? "http://localhost:3000"}/accept-invitation/${data.id}`;
+        // getBaseURL() resolves the same way Better Auth resolves its own baseURL
+        // (BETTER_AUTH_URL env, then related conventions) — a hardcoded localhost
+        // fallback here would silently break invitation links in any deploy that
+        // doesn't set it, same failure mode as the sign-in CORS bug. Fail loudly
+        // instead of emailing a broken link if it's genuinely unconfigured.
+        const baseURL = getBaseURL();
+        if (!baseURL) {
+          throw new Error(
+            "BETTER_AUTH_URL is not set — cannot build an invitation link.",
+          );
+        }
+        const url = `${baseURL}/accept-invitation/${data.id}`;
         await sendPlainEmail({
           to: data.email,
           subject: `You've been added to crew on ${data.organization.name}`,
