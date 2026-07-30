@@ -46,7 +46,12 @@ export default async function Home() {
       <p className="max-w-sm text-sm text-ink-soft">
         Signed in as {session.user.email}. The Today screen lands in issue #11.
       </p>
-      <SignOutButton />
+      <div className="flex items-center gap-4">
+        <Link href="/profile" className="text-[13px] font-semibold text-burgundy">
+          Edit profile
+        </Link>
+        <SignOutButton />
+      </div>
     </div>
   );
 }
