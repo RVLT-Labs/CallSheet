@@ -22,6 +22,7 @@ model User {
   name          String
   image         String?
   phone         String? // day-of contact only, never used for auth (spec §4.2a)
+  onboardedAt   DateTime? // set when a self-signup user (no invite) finishes the welcome flow — creating their first film — so it never replays
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

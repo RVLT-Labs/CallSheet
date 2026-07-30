@@ -30,7 +30,7 @@ function StepDots({ step }: { step: Step }) {
  * multi-step flows): details → invite crew → success. The invite step is
  * genuinely skippable, no dark pattern forcing it.
  */
-export function FilmCreationWizard() {
+export function FilmCreationWizard({ finalRedirect = "/" }: { finalRedirect?: string }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
 
@@ -261,7 +261,7 @@ export function FilmCreationWizard() {
         ))}
       </div>
 
-      <Button variant="primary" onClick={() => router.push("/")} className="w-full">
+      <Button variant="primary" onClick={() => router.push(finalRedirect)} className="w-full">
         Go to {result?.filmName}
       </Button>
     </div>
