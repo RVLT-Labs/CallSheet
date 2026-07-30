@@ -177,14 +177,17 @@ model Availability {
   halfDay      HalfDay
   tier         AvailabilityTier
   source       AvailabilitySource @default(manual)
+  sourceRuleId String? // which RecurringAvailabilityRule generated this row, when source = recurring
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 
-  membership Member @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  membership Member                     @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  sourceRule  RecurringAvailabilityRule? @relation(fields: [sourceRuleId], references: [id], onDelete: SetNull)
 
   // one tier per person/date/half-day — manual entries overwrite in place rather than stacking rows
   @@unique([membershipId, date, halfDay])
   @@index([membershipId])
+  @@index([sourceRuleId])
 }
 
 // A recurring rule generates/refreshes Availability rows with source = recurring.
@@ -201,7 +204,8 @@ model RecurringAvailabilityRule {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  membership Member @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  membership            Member         @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  generatedAvailability Availability[]
 
   @@index([membershipId])
 }
