@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { PageShell } from "@/components/ui/page-shell";
 import { ProportionBar } from "@/components/ui/proportion-bar";
 import { RequiredMarker, StatusDot } from "@/components/ui/status-dot";
 import { Sheet } from "@/components/ui/sheet";
@@ -77,7 +78,7 @@ export function ShootDetailView({ shoot, isOrganiser }: { shoot: ShootDetailData
   const activeInvite = activeMembershipId ? invitesByMembership.get(activeMembershipId) : undefined;
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-8 md:px-8">
+    <PageShell maxWidth="max-w-6xl">
       <div className="mb-6">
         <div className="mb-1.5 flex items-center justify-between">
           <StatusDot
@@ -220,7 +221,7 @@ export function ShootDetailView({ shoot, isOrganiser }: { shoot: ShootDetailData
           onClose={() => setActiveMembershipId(null)}
         />
       )}
-    </div>
+    </PageShell>
   );
 }
 

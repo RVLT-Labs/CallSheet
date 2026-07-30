@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ComponentType, ReactNode, SVGProps } from "react";
 
 import { cn } from "@/lib/cn";
-import { CalendarIcon, ClapperboardIcon, EnvelopeIcon, HomeIcon } from "@/components/ui/icons";
+import { CalendarIcon, ClapperboardIcon, HomeIcon } from "@/components/ui/icons";
 
 export type NavItem = {
   label: string;
@@ -10,11 +10,12 @@ export type NavItem = {
   icon: ComponentType<SVGProps<SVGSVGElement>>;
 };
 
+// Comms (bulk messaging, issue #15) isn't built yet — left out of the nav
+// until the route exists rather than linking somewhere that 404s.
 export const DEFAULT_NAV_ITEMS: NavItem[] = [
   { label: "Today", href: "/", icon: HomeIcon },
   { label: "Availability", href: "/availability", icon: CalendarIcon },
   { label: "Shoots", href: "/shoots", icon: ClapperboardIcon },
-  { label: "Comms", href: "/comms", icon: EnvelopeIcon },
 ];
 
 type NavProps = {
@@ -60,7 +61,9 @@ export function BottomTabBar({ items = DEFAULT_NAV_ITEMS, activeHref }: NavProps
 export function TopNav({ items = DEFAULT_NAV_ITEMS, activeHref }: NavProps) {
   return (
     <nav className="hidden items-center justify-between border-b border-hairline px-8 py-4 md:flex">
-      <span className="font-display text-xl font-bold italic text-burgundy">Callsheet</span>
+      <Link href="/" className="font-display text-xl font-bold italic text-burgundy">
+        Callsheet
+      </Link>
       <div className="flex gap-8">
         {items.map((item) => {
           const active = item.href === activeHref;
@@ -93,7 +96,10 @@ export function NavShell({ activeHref, children }: { activeHref: string; childre
   return (
     <>
       <TopNav activeHref={activeHref} />
-      <div className="flex flex-1 flex-col">{children}</div>
+      {/* cream-deep canvas on desktop only — gives page content (a PageShell
+          sheet, or CenteredCard) a background to sit on top of, so it doesn't
+          just blend into the page (mobile stays edge-to-edge, no canvas). */}
+      <div className="flex flex-1 flex-col md:bg-cream-deep">{children}</div>
       <BottomTabBar activeHref={activeHref} />
     </>
   );

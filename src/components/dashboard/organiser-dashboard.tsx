@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { PageShell } from "@/components/ui/page-shell";
 import { ProportionBar } from "@/components/ui/proportion-bar";
 import { StatusDot } from "@/components/ui/status-dot";
 import type { OrganiserDashboardShoot } from "@/server/dashboard";
@@ -20,7 +21,7 @@ export function OrganiserDashboard({
   upcoming: OrganiserDashboardShoot[];
 }) {
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8 md:px-8">
+    <PageShell maxWidth="max-w-7xl">
       <p className="mb-1 text-[13px] text-ink-soft">{filmName}</p>
       <h1 className="mb-8 font-display text-2xl font-bold italic text-burgundy md:text-3xl">Dashboard</h1>
 
@@ -73,6 +74,6 @@ export function OrganiserDashboard({
           </Button>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

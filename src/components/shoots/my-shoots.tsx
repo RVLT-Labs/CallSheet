@@ -7,6 +7,7 @@ import { acceptAllInvitesAction, respondToInviteAction } from "@/app/shoots/acti
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ChevronRightIcon } from "@/components/ui/icons";
+import { PageShell } from "@/components/ui/page-shell";
 import { Sheet } from "@/components/ui/sheet";
 import { StatusDot } from "@/components/ui/status-dot";
 import { StickyFooterAction } from "@/components/ui/sticky-footer-action";
@@ -41,7 +42,7 @@ export function MyShoots({ pending, upcoming, past }: { pending: MyShoot[]; upco
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-8 md:px-8">
+    <PageShell maxWidth="max-w-6xl">
       <h1 className="font-display mb-6 text-2xl font-bold italic text-burgundy md:text-3xl">My Shoots</h1>
 
       {soonest && (
@@ -168,6 +169,6 @@ export function MyShoots({ pending, upcoming, past }: { pending: MyShoot[]; upco
           )}
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

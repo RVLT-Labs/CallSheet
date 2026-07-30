@@ -7,6 +7,7 @@ export * from "@/components/ui/icons";
 export * from "@/components/ui/list-row";
 export * from "@/components/ui/nav";
 export * from "@/components/ui/opt-group";
+export * from "@/components/ui/page-shell";
 export * from "@/components/ui/pill-row";
 export * from "@/components/ui/proportion-bar";
 export * from "@/components/ui/role-chip";

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { AvailabilityCalendar } from "@/components/availability/availability-calendar";
 import { NavShell } from "@/components/ui/nav";
+import { PageShell } from "@/components/ui/page-shell";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAvailabilityCalendarData } from "@/server/availability";
@@ -46,7 +47,7 @@ export default async function AvailabilityPage() {
 
   return (
     <NavShell activeHref="/availability">
-      <div className="mx-auto w-full max-w-3xl px-4 py-8 md:px-8">
+      <PageShell maxWidth="max-w-5xl">
         <div className="mb-6 flex items-baseline justify-between">
           <div>
             <h1 className="font-display mb-1 text-2xl font-bold italic text-burgundy md:text-3xl">Your availability</h1>
@@ -75,7 +76,7 @@ export default async function AvailabilityPage() {
             effectiveEnd: r.effectiveEnd ? r.effectiveEnd.toISOString().slice(0, 10) : null,
           }))}
         />
-      </div>
+      </PageShell>
     </NavShell>
   );
 }

@@ -7,6 +7,7 @@ import { ShootSlotSwap } from "@/components/shoots/shoot-slot-swap";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { NavShell } from "@/components/ui/nav";
+import { PageShell } from "@/components/ui/page-shell";
 import { StatusDot } from "@/components/ui/status-dot";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -44,7 +45,7 @@ export default async function ShootsPage() {
 
   return (
     <NavShell activeHref="/shoots">
-      <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
+      <PageShell maxWidth="max-w-7xl">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="font-display text-2xl font-bold italic text-burgundy md:text-3xl">Shoots</h1>
           <Button href="/shoots/new">Plan a shoot</Button>
@@ -92,7 +93,7 @@ export default async function ShootsPage() {
             );
           })}
         </div>
-      </div>
+      </PageShell>
     </NavShell>
   );
 }

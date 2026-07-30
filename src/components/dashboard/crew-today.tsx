@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { DayStrip } from "@/components/dashboard/day-strip";
+import { PageShell } from "@/components/ui/page-shell";
 import { StatusDot } from "@/components/ui/status-dot";
 import type { MyShoot } from "@/server/my-shoots";
 
@@ -18,7 +19,7 @@ export function CrewToday({ filmName, upcoming }: { filmName: string; upcoming: 
   const markedDateIsos = new Set(upcoming.flatMap((s) => s.dateIsos));
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8 md:px-8">
+    <PageShell maxWidth="max-w-7xl">
       <p className="mb-1 text-[13px] text-ink-soft">{filmName}</p>
       <h1 className="mb-8 font-display text-2xl font-bold italic text-burgundy md:text-3xl">Today</h1>
 
@@ -61,6 +62,6 @@ export function CrewToday({ filmName, upcoming }: { filmName: string; upcoming: 
           </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }
