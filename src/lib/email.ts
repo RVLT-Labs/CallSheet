@@ -17,9 +17,7 @@ if (process.env.NODE_ENV !== "production") {
 
 export const EMAIL_FROM = process.env.EMAIL_FROM ?? "Callsheet <noreply@rvlt.app>";
 
-// Plain-text/minimal HTML sends for the auth flows (issue #1 scope). The real
-// templated shoot-invite and change-notification emails are built in issue #10
-// with a table-based layout for client compatibility (design system §9).
+// Plain-text/minimal HTML sends for the auth flows (issue #1 scope).
 export async function sendPlainEmail(params: {
   to: string;
   subject: string;
@@ -30,5 +28,24 @@ export async function sendPlainEmail(params: {
     to: params.to,
     subject: params.subject,
     html: params.html,
+  });
+}
+
+// Templated shoot-invite/change-notification/reminder sends (issue #10) — table-based
+// layout with inlined styles, optionally carrying the per-person .ics attachment.
+export async function sendTemplatedEmail(params: {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  attachment?: { filename: string; content: string; contentType: string };
+}) {
+  return resend.emails.send({
+    from: EMAIL_FROM,
+    to: params.to,
+    subject: params.subject,
+    html: params.html,
+    text: params.text,
+    attachments: params.attachment ? [params.attachment] : undefined,
   });
 }

@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { StatusDot } from "@/components/ui/status-dot";
+import { HALF_DAY_LABEL } from "@/lib/half-day";
 import { canNudgeInvite, type InviteStatus } from "@/server/shoot-roster";
 
 import {
@@ -24,8 +25,6 @@ const INVITE_LABEL: Record<InviteStatus, string> = {
   declined: "Declined",
   pending: "Pending",
 };
-
-const HALF_DAY_LABEL: Record<"AM" | "PM", string> = { AM: "Morning", PM: "Afternoon" };
 
 type PersonSheetProps = {
   shootId: string;

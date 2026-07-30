@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  REMINDER_THRESHOLD_DAYS,
   canNudgeInvite,
   countRsvpStatuses,
+  isInviteDueForReminder,
   removalOutcomeForInvite,
   resolveEffectiveCallTime,
+  shouldNotifyShootChange,
 } from "@/server/shoot-roster";
 
 describe("resolveEffectiveCallTime", () => {
@@ -53,5 +56,55 @@ describe("countRsvpStatuses", () => {
 
   it("returns zeros for an empty roster", () => {
     expect(countRsvpStatuses([])).toEqual({ accepted: 0, declined: 0, pending: 0 });
+  });
+});
+
+describe("shouldNotifyShootChange", () => {
+  it("never notifies for a Tentative shoot, since it has no invites yet", () => {
+    expect(shouldNotifyShootChange("tentative", 1)).toBe(false);
+    expect(shouldNotifyShootChange("tentative", 0)).toBe(false);
+  });
+
+  it("notifies for a Confirmed shoot only when something actually changed", () => {
+    expect(shouldNotifyShootChange("confirmed", 0)).toBe(false);
+    expect(shouldNotifyShootChange("confirmed", 1)).toBe(true);
+    expect(shouldNotifyShootChange("confirmed", 2)).toBe(true);
+  });
+});
+
+describe("isInviteDueForReminder", () => {
+  const sentAt = new Date("2026-01-01T00:00:00Z");
+  const justUnderThreshold = new Date(sentAt.getTime() + (REMINDER_THRESHOLD_DAYS * 86_400_000 - 1));
+  const atThreshold = new Date(sentAt.getTime() + REMINDER_THRESHOLD_DAYS * 86_400_000);
+
+  it("is not due before the threshold elapses", () => {
+    expect(isInviteDueForReminder({ status: "pending", sentAt, lastReminderSentAt: null }, justUnderThreshold)).toBe(
+      false,
+    );
+  });
+
+  it("is due once the threshold elapses", () => {
+    expect(isInviteDueForReminder({ status: "pending", sentAt, lastReminderSentAt: null }, atThreshold)).toBe(true);
+  });
+
+  it("is never due twice — a prior reminder blocks another", () => {
+    expect(
+      isInviteDueForReminder({ status: "pending", sentAt, lastReminderSentAt: atThreshold }, atThreshold),
+    ).toBe(false);
+  });
+
+  it("is never due for someone who already responded", () => {
+    expect(isInviteDueForReminder({ status: "accepted", sentAt, lastReminderSentAt: null }, atThreshold)).toBe(
+      false,
+    );
+    expect(isInviteDueForReminder({ status: "declined", sentAt, lastReminderSentAt: null }, atThreshold)).toBe(
+      false,
+    );
+  });
+
+  it("is never due if the invite was never actually sent", () => {
+    expect(isInviteDueForReminder({ status: "pending", sentAt: null, lastReminderSentAt: null }, atThreshold)).toBe(
+      false,
+    );
   });
 });
