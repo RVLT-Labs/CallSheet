@@ -1,6 +1,7 @@
 export * from "@/components/ui/avatar";
 export * from "@/components/ui/button";
 export * from "@/components/ui/card";
+export * from "@/components/ui/centered-card";
 export * from "@/components/ui/day-chips";
 export * from "@/components/ui/icons";
 export * from "@/components/ui/list-row";
@@ -12,6 +13,7 @@ export * from "@/components/ui/role-chip";
 export * from "@/components/ui/sheet";
 export * from "@/components/ui/status-dot";
 export * from "@/components/ui/sticky-footer-action";
+export * from "@/components/ui/submit-button";
 export * from "@/components/ui/text-field";
 export * from "@/components/ui/toast";
 export * from "@/components/ui/toggle";

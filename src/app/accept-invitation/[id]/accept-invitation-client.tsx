@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
-import { AuthLayout } from "@/components/auth/auth-layout";
+import { CenteredCard } from "@/components/ui/centered-card";
 import { MagicLinkFlow } from "@/components/auth/magic-link-flow";
 import { authClient, useSession } from "@/lib/auth-client";
 
@@ -36,11 +36,11 @@ export function AcceptInvitationClient({ invitationId, inviterName, filmName, ro
   }, [session, email, invitationId, router]);
 
   return (
-    <AuthLayout>
+    <CenteredCard>
       <MagicLinkFlow
         callbackURL={`/accept-invitation/${invitationId}`}
         invite={{ inviterName, filmName, role, email }}
       />
-    </AuthLayout>
+    </CenteredCard>
   );
 }
