@@ -4,7 +4,8 @@ import { organization, magicLink } from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
 
 import { prisma } from "@/lib/prisma";
-import { sendPlainEmail } from "@/lib/email";
+import { sendTemplatedEmail } from "@/lib/email";
+import { renderMagicLinkEmail, renderCrewInvitationEmail } from "@/lib/email-templates";
 
 // Films are modelled as Better Auth Organizations, crew as Members, per spec §4.1.
 // Organiser = org owner/admin, crew = org member — Better Auth's default roles map
@@ -23,11 +24,8 @@ export const auth = betterAuth({
   plugins: [
     magicLink({
       sendMagicLink: async ({ email, url }) => {
-        await sendPlainEmail({
-          to: email,
-          subject: "Your Callsheet sign-in link",
-          html: `<p>Tap below to sign in to Callsheet.</p><p><a href="${url}">Sign in</a></p><p>This link expires shortly and only works once.</p>`,
-        });
+        const { subject, html, text } = renderMagicLinkEmail({ url });
+        await sendTemplatedEmail({ to: email, subject, html, text });
       },
     }),
     organization({
@@ -71,11 +69,17 @@ export const auth = betterAuth({
           );
         }
         const url = `${baseURL}/accept-invitation/${data.id}`;
-        await sendPlainEmail({
-          to: data.email,
-          subject: `You've been added to crew on ${data.organization.name}`,
-          html: `<p>${data.inviter.user.name} added you to crew on <strong>${data.organization.name}</strong> on Callsheet.</p><p><a href="${url}">Set your availability</a></p>`,
+        // roleTags is an additionalField on the invitation schema (registered below),
+        // not part of better-auth's base Invitation type — same cast pattern as
+        // afterAcceptInvitation below.
+        const roleTags = (data.invitation as { roleTags?: string[] }).roleTags;
+        const { subject, html, text } = renderCrewInvitationEmail({
+          inviterName: data.inviter.user.name,
+          filmName: data.organization.name,
+          roleTag: roleTags?.[0] ?? null,
+          url,
         });
+        await sendTemplatedEmail({ to: data.email, subject, html, text });
       },
       organizationHooks: {
         afterAcceptInvitation: async ({ invitation, member }) => {
