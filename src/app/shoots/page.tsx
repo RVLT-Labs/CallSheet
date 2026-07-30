@@ -1,14 +1,11 @@
 import { headers } from "next/headers";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { MyShoots } from "@/components/shoots/my-shoots";
-import { ShootSlotSwap } from "@/components/shoots/shoot-slot-swap";
+import { ShootsList, type ShootListItem } from "@/components/shoots/shoots-list";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { NavShell } from "@/components/ui/nav-shell";
 import { PageShell } from "@/components/ui/page-shell";
-import { StatusDot } from "@/components/ui/status-dot";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getMyShootsData } from "@/server/my-shoots";
@@ -61,44 +58,25 @@ export default async function ShootsPage() {
           </div>
         )}
 
-        <div className="md:grid md:grid-cols-2 md:gap-4 lg:grid-cols-3">
-          {shoots.map((shoot) => {
-            const dates = [...new Set(shoot.days.map((d) => d.date.toISOString().slice(0, 10)))];
-            const activeSlots = shoot.slots.filter((s) => !s.removedAt);
-            const requiredSlots = activeSlots.filter((s) => s.kind === "required");
-            const generalSlots = activeSlots.filter((s) => s.kind === "general");
-
-            return (
-              <div key={shoot.id} className="mb-4 last:mb-0 md:mb-0">
-                <Card>
-                  <Link href={`/shoots/${shoot.id}`} className="mb-1.5 flex items-center justify-between">
-                    <p className="text-[14px] font-semibold">
-                      {shoot.title ?? (dates.length === 1 ? dates[0] : `${dates[0]} – ${dates[dates.length - 1]}`)}
-                    </p>
-                    <StatusDot
-                      tone={shoot.status === "confirmed" ? "forest" : "terracotta"}
-                      label={shoot.status === "confirmed" ? "Confirmed" : "Tentative"}
-                    />
-                  </Link>
-                  <p className="mb-2 text-[12px] text-ink-soft">
-                    {requiredSlots.length} required · {generalSlots.length} general
-                  </p>
-
-                  {[...requiredSlots, ...generalSlots]
-                    .filter((slot) => !slot.membershipId)
-                    .map((slot) => (
-                      <ShootSlotSwap
-                        key={slot.id}
-                        slotId={slot.id}
-                        label={slot.placeholderLabel ?? ""}
-                        crew={crew.map((c) => ({ membershipId: c.id, name: c.user.name }))}
-                      />
-                    ))}
-                </Card>
-              </div>
-            );
-          })}
-        </div>
+        {shoots.length > 0 && (
+          <ShootsList
+            shoots={shoots.map((shoot): ShootListItem => {
+              const activeSlots = shoot.slots.filter((s) => !s.removedAt);
+              return {
+                id: shoot.id,
+                title: shoot.title,
+                status: shoot.status,
+                dateIsos: [...new Set(shoot.days.map((d) => d.date.toISOString().slice(0, 10)))].sort(),
+                requiredCount: activeSlots.filter((s) => s.kind === "required").length,
+                generalCount: activeSlots.filter((s) => s.kind === "general").length,
+                placeholderSlots: activeSlots
+                  .filter((s) => !s.membershipId)
+                  .map((s) => ({ id: s.id, label: s.placeholderLabel ?? "" })),
+              };
+            })}
+            crew={crew.map((c) => ({ membershipId: c.id, name: c.user.name }))}
+          />
+        )}
       </PageShell>
     </NavShell>
   );
