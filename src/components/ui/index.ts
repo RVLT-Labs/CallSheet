@@ -3,6 +3,7 @@ export * from "@/components/ui/button";
 export * from "@/components/ui/card";
 export * from "@/components/ui/centered-card";
 export * from "@/components/ui/day-chips";
+export * from "@/components/ui/error-toast";
 export * from "@/components/ui/icons";
 export * from "@/components/ui/list-row";
 export * from "@/components/ui/nav";

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import Link from "next/link";
 
 import { acceptAllInvitesAction, respondToInviteAction } from "@/app/shoots/actions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ChevronRightIcon } from "@/components/ui/icons";
+import { ErrorToast } from "@/components/ui/error-toast";
 import { PageShell } from "@/components/ui/page-shell";
 import { Sheet } from "@/components/ui/sheet";
 import { StatusDot } from "@/components/ui/status-dot";
@@ -23,21 +24,45 @@ function dateLabel(dateIsos: string[]) {
   return `${dateIsos[0]} – ${dateIsos[dateIsos.length - 1]}`;
 }
 
-export function MyShoots({ pending, upcoming, past }: { pending: MyShoot[]; upcoming: MyShoot[]; past: MyShoot[] }) {
+function applyInviteResponse(
+  state: MyShoot[],
+  update: { inviteIds: string[]; status: "accepted" | "declined" },
+): MyShoot[] {
+  return state.map((s) =>
+    s.inviteId && update.inviteIds.includes(s.inviteId) ? { ...s, inviteStatus: update.status } : s,
+  );
+}
+
+export function MyShoots({ upcoming, past }: { upcoming: MyShoot[]; past: MyShoot[] }) {
+  const [optimisticUpcoming, applyOptimisticResponse] = useOptimistic(upcoming, applyInviteResponse);
+  const pending = optimisticUpcoming.filter((s) => s.inviteStatus === "pending");
   const { soonest, rest } = splitSoonestPending(pending);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [pastOpen, setPastOpen] = useState(false);
-  const [pending_, startTransition] = useTransition();
+  const [isSaving, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   function respond(inviteId: string, response: "accepted" | "declined") {
-    startTransition(() => respondToInviteAction(inviteId, response));
+    startTransition(async () => {
+      applyOptimisticResponse({ inviteIds: [inviteId], status: response });
+      try {
+        await respondToInviteAction(inviteId, response);
+      } catch {
+        setError("Couldn't save your response. Try again.");
+      }
+    });
   }
 
   function acceptAll() {
     const ids = pending.map((s) => s.inviteId).filter((id): id is string => Boolean(id));
+    setSheetOpen(false);
     startTransition(async () => {
-      await acceptAllInvitesAction(ids);
-      setSheetOpen(false);
+      applyOptimisticResponse({ inviteIds: ids, status: "accepted" });
+      try {
+        await acceptAllInvitesAction(ids);
+      } catch {
+        setError("Couldn't accept all. Try again.");
+      }
     });
   }
 
@@ -54,7 +79,7 @@ export function MyShoots({ pending, upcoming, past }: { pending: MyShoot[]; upco
           <div className="flex gap-3">
             <Button
               variant="primary"
-              disabled={pending_}
+              disabled={isSaving}
               onClick={() => soonest.inviteId && respond(soonest.inviteId, "accepted")}
               className="flex-1"
             >
@@ -62,7 +87,7 @@ export function MyShoots({ pending, upcoming, past }: { pending: MyShoot[]; upco
             </Button>
             <Button
               variant="secondary"
-              disabled={pending_}
+              disabled={isSaving}
               onClick={() => soonest.inviteId && respond(soonest.inviteId, "declined")}
               className="flex-1"
             >
@@ -95,7 +120,7 @@ export function MyShoots({ pending, upcoming, past }: { pending: MyShoot[]; upco
               <div className="flex gap-2">
                 <button
                   type="button"
-                  disabled={pending_}
+                  disabled={isSaving}
                   onClick={() => shoot.inviteId && respond(shoot.inviteId, "accepted")}
                   className="text-[12px] font-semibold text-forest"
                 >
@@ -103,7 +128,7 @@ export function MyShoots({ pending, upcoming, past }: { pending: MyShoot[]; upco
                 </button>
                 <button
                   type="button"
-                  disabled={pending_}
+                  disabled={isSaving}
                   onClick={() => shoot.inviteId && respond(shoot.inviteId, "declined")}
                   className="text-[12px] font-semibold text-burgundy"
                 >
@@ -115,7 +140,7 @@ export function MyShoots({ pending, upcoming, past }: { pending: MyShoot[]; upco
         </div>
         {needsStickyAcceptAllFooter(pending.length) && (
           <StickyFooterAction>
-            <Button variant="primary" disabled={pending_} onClick={acceptAll} className="w-full">
+            <Button variant="primary" disabled={isSaving} onClick={acceptAll} className="w-full">
               Accept all
             </Button>
           </StickyFooterAction>
@@ -124,9 +149,9 @@ export function MyShoots({ pending, upcoming, past }: { pending: MyShoot[]; upco
 
       <div className="mt-8">
         <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Upcoming</p>
-        {upcoming.length === 0 && <p className="text-[13px] text-ink-soft">{NOTHING_SCHEDULED_COPY}</p>}
+        {optimisticUpcoming.length === 0 && <p className="text-[13px] text-ink-soft">{NOTHING_SCHEDULED_COPY}</p>}
         <div className="md:grid md:grid-cols-2 md:gap-x-10">
-          {upcoming.map((shoot) => (
+          {optimisticUpcoming.map((shoot) => (
             <Link
               key={shoot.id}
               href={`/shoots/${shoot.id}`}
@@ -169,6 +194,8 @@ export function MyShoots({ pending, upcoming, past }: { pending: MyShoot[]; upco
           )}
         </div>
       )}
+
+      <ErrorToast message={error} onDismiss={() => setError(null)} />
     </PageShell>
   );
 }

@@ -30,10 +30,10 @@ export default async function ShootsPage() {
   const isOrganiser = membership.role !== "member";
 
   if (!isOrganiser) {
-    const { pending, upcoming, past } = await getMyShootsData(membership.id, organizationId, film.showTentativeToCrew);
+    const { upcoming, past } = await getMyShootsData(membership.id, organizationId, film.showTentativeToCrew);
     return (
       <NavShell activeHref="/shoots" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={organizationId}>
-        <MyShoots pending={pending} upcoming={upcoming} past={past} />
+        <MyShoots upcoming={upcoming} past={past} />
       </NavShell>
     );
   }

@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useOptimistic, useState, useTransition } from "react";
 
+import { ErrorToast } from "@/components/ui/error-toast";
 import { OptGroup } from "@/components/ui/opt-group";
 import { PillRow } from "@/components/ui/pill-row";
 import { ChevronRightIcon } from "@/components/ui/icons";
@@ -12,6 +13,21 @@ import { setBulkTier, setDayTier } from "@/app/availability/actions";
 import { parseIsoDateUtc, toIsoDate, utcDate, type HalfDay } from "@/server/availability-rules";
 
 type DayCellData = { dateIso: string; am: HalfDayState; pm: HalfDayState };
+
+function applyTierUpdate(
+  state: DayCellData[],
+  updates: { dateIso: string; halfDay: "AM" | "PM"; tier: Tier }[],
+): DayCellData[] {
+  const byIso = new Map(state.map((d) => [d.dateIso, d]));
+  for (const { dateIso, halfDay, tier } of updates) {
+    const existing = byIso.get(dateIso) ?? { dateIso, am: null, pm: null };
+    byIso.set(dateIso, {
+      ...existing,
+      [halfDay === "AM" ? "am" : "pm"]: { tier, source: "manual" as const, ruleLabel: null },
+    });
+  }
+  return [...byIso.values()];
+}
 
 type AvailabilityCalendarProps = {
   windowStart: string;
@@ -212,9 +228,11 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
   const [dragging, setDragging] = useState(false);
   const [dragStartedFresh, setDragStartedFresh] = useState(true);
   const [bulkSelection, setBulkSelection] = useState<string[] | null>(null);
-  const [pending, setPending] = useState(false);
+  const [optimisticDays, applyOptimisticDays] = useOptimistic(days, applyTierUpdate);
+  const [isSaving, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
-  const daysByIso = useMemo(() => new Map(days.map((d) => [d.dateIso, d])), [days]);
+  const daysByIso = useMemo(() => new Map(optimisticDays.map((d) => [d.dateIso, d])), [optimisticDays]);
 
   const weeks = useMemo(
     () => buildMonthWeeks(viewYear, viewMonth, windowStart, windowEnd),
@@ -265,10 +283,8 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
     setSelectedDate(null);
   }
 
-  async function applyBulkTier(target: TargetHalf, tier: Tier) {
-    if (!bulkSelection) return;
-    setPending(true);
-    const cells = bulkSelection.flatMap((dateIso) =>
+  function cellsForTarget(dateIsos: string[], target: TargetHalf) {
+    return dateIsos.flatMap((dateIso) =>
       target === "BOTH"
         ? [
             { dateIso, halfDay: "AM" as const },
@@ -276,26 +292,38 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
           ]
         : [{ dateIso, halfDay: target }],
     );
-    await setBulkTier(cells, tier);
-    setPending(false);
-    setBulkSelection(null);
   }
 
-  async function applyDayTier(target: TargetHalf, tier: Tier) {
+  function applyBulkTier(target: TargetHalf, tier: Tier) {
+    if (!bulkSelection) return;
+    const cells = cellsForTarget(bulkSelection, target);
+    setBulkSelection(null);
+    startTransition(async () => {
+      applyOptimisticDays(cells.map((c) => ({ ...c, tier })));
+      try {
+        await setBulkTier(cells, tier);
+      } catch {
+        setError("Couldn't save your availability. Try again.");
+      }
+    });
+  }
+
+  function applyDayTier(target: TargetHalf, tier: Tier) {
     if (!selectedDate) return;
-    setPending(true);
-    if (target === "BOTH") {
-      await setBulkTier(
-        [
-          { dateIso: selectedDate, halfDay: "AM" },
-          { dateIso: selectedDate, halfDay: "PM" },
-        ],
-        tier,
-      );
-    } else {
-      await setDayTier(selectedDate, target, tier);
-    }
-    setPending(false);
+    const dateIso = selectedDate;
+    const cells = cellsForTarget([dateIso], target);
+    startTransition(async () => {
+      applyOptimisticDays(cells.map((c) => ({ ...c, tier })));
+      try {
+        if (target === "BOTH") {
+          await setBulkTier(cells, tier);
+        } else {
+          await setDayTier(dateIso, target, tier);
+        }
+      } catch {
+        setError("Couldn't save your availability. Try again.");
+      }
+    });
   }
 
   const selectedDay = selectedDate ? daysByIso.get(selectedDate) : undefined;
@@ -330,7 +358,7 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
         </button>
       </div>
 
-      {days.length === 0 && rules.length === 0 && (
+      {optimisticDays.length === 0 && rules.length === 0 && (
         <p className="mb-3 text-[12.5px] text-ink-soft">
           Nothing set yet. Tap a day below to mark yourself Best, OK, or Unavailable, or drag across a few days to
           set them all at once.
@@ -383,7 +411,7 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
         <BulkDetailPanel
           key={[...bulkSelection].sort().join(",")}
           dates={bulkSelection}
-          pending={pending}
+          pending={isSaving}
           onApply={applyBulkTier}
           onCancel={() => setBulkSelection(null)}
         />
@@ -395,7 +423,7 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
           dateIso={selectedDate}
           am={selectedDay?.am ?? null}
           pm={selectedDay?.pm ?? null}
-          pending={pending}
+          pending={isSaving}
           onApply={applyDayTier}
           onClose={() => setSelectedDate(null)}
         />
@@ -404,6 +432,8 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
       <div className="mt-8 border-t border-hairline pt-6">
         <RecurringRulesSection rules={rules} windowStart={windowStart} windowEnd={windowEnd} />
       </div>
+
+      <ErrorToast message={error} onDismiss={() => setError(null)} />
     </div>
   );
 }
