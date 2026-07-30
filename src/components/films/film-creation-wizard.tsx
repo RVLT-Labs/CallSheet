@@ -98,10 +98,10 @@ export function FilmCreationWizard({ finalRedirect = "/" }: { finalRedirect?: st
         <p className="mb-6 text-[12.5px] text-ink-soft">Set up the basics. You can change any of this later.</p>
 
         <div className="md:grid md:grid-cols-2 md:gap-6">
-          <TextField label="Title" placeholder="e.g. Pippin" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <TextField label="Title" placeholder="e.g. Verdant Hour" value={title} onChange={(e) => setTitle(e.target.value)} />
           <TextField
-            label="Company / society"
-            placeholder="e.g. UNSW MTS"
+            label="Production company"
+            placeholder="e.g. Late Bloom Pictures"
             value={company}
             onChange={(e) => setCompany(e.target.value)}
           />

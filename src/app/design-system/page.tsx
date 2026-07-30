@@ -197,7 +197,7 @@ export default function DesignSystemPage() {
           <div className="w-[280px]">
             <SubTitle>Flat row (everything else)</SubTitle>
             <ListRow>
-              <span>Dress Rehearsal — Day 1</span>
+              <span>Camera Test — Day 1</span>
               <span className="font-semibold text-forest">Accepted</span>
             </ListRow>
             <ListRow>

@@ -140,7 +140,7 @@ export function LandingPage() {
                   Upcoming
                 </p>
                 <ListRow>
-                  <span className="text-[12px]">Dress Rehearsal</span>
+                  <span className="text-[12px]">Camera Test</span>
                   <StatusDot tone="forest" label="Accepted" />
                 </ListRow>
                 <ListRow>
@@ -148,7 +148,7 @@ export function LandingPage() {
                   <StatusDot tone="terracotta" label="Tentative" />
                 </ListRow>
                 <ListRow>
-                  <span className="text-[12px]">Read-through</span>
+                  <span className="text-[12px]">Table Read</span>
                   <StatusDot tone="ink-faint" label="Pending" />
                 </ListRow>
                 <ListRow>
