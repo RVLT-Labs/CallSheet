@@ -29,6 +29,14 @@ const FEATURES = [
     title: "Tentative isn't just a lighter confirmed",
     body: "A tentative shoot shows what it needs to firm up. A confirmed one shows who's actually coming.",
   },
+  {
+    title: "Sign in with a magic link",
+    body: "No password to remember and nothing to set up before your first shoot. Click the link in your invite email.",
+  },
+  {
+    title: "Set the film's working dates once",
+    body: "Every crew member's calendar bounds itself to the shoot window automatically, nobody marks availability for a date that doesn't matter.",
+  },
 ];
 
 export function LandingPage() {
@@ -59,60 +67,133 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="overflow-x-auto px-6 pb-14">
-        <div className="mx-auto flex w-fit gap-6">
-          <PhoneMockup label="Set your availability">
-            <p className="font-display text-sm font-bold italic text-burgundy">Tech Day 3</p>
-            <p className="mb-3 text-[10px] text-ink-soft">Fri 14 March</p>
-            <OptGroup
-              aria-label="Availability tier"
-              value={tier}
-              onChange={() => {}}
-              options={[
-                { value: "best", label: "Best", tone: "forest" },
-                { value: "ok", label: "OK", tone: "terracotta" },
-                { value: "no", label: "No", tone: "burgundy" },
-              ]}
-            />
-            <p className="mb-2 mt-4 text-[10px] font-semibold text-ink-soft">Repeats weekly</p>
-            <DayChips selected={days} onToggle={() => {}} />
-          </PhoneMockup>
+      <section className="px-6 pb-16">
+        <p className="mx-auto mb-8 max-w-md text-center text-[13px] text-ink-soft">
+          The screens below are the actual components the app ships with, at the size they
+          render on a phone, not renders of a design file.
+        </p>
+        <div className="overflow-x-auto">
+          <div className="mx-auto flex w-fit gap-8 px-1 pb-2">
+            <PhoneMockup label="Set your availability">
+              <div className="flex-1 overflow-y-auto px-4 pt-9 pb-4">
+                <h2 className="font-display mb-1 text-lg font-bold italic text-burgundy">
+                  Your availability
+                </h2>
+                <p className="mb-5 text-[11px] text-ink-soft">Verdant Hour · 3–21 Mar</p>
 
-          <PhoneMockup label="See today at a glance">
-            <Card>
-              <div className="text-[13px] font-bold">Tech Day 3</div>
-              <div className="mt-0.5 text-[10.5px] text-ink-soft">
-                Fri 13 March · needs your response
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+                  Tech Day 3 · Fri 14 March
+                </p>
+                <OptGroup
+                  aria-label="Availability tier"
+                  value={tier}
+                  onChange={() => {}}
+                  options={[
+                    { value: "best", label: "Best", tone: "forest" },
+                    { value: "ok", label: "OK", tone: "terracotta" },
+                    { value: "no", label: "No", tone: "burgundy" },
+                  ]}
+                />
+
+                <p className="mb-2 mt-6 text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+                  Repeats weekly
+                </p>
+                <DayChips selected={days} onToggle={() => {}} />
+
+                <p className="mb-1 mt-6 text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+                  This week
+                </p>
+                <ListRow>
+                  <span className="text-[12px]">Mon 3 Mar · AM</span>
+                  <StatusDot tone="forest" label="Best" />
+                </ListRow>
+                <ListRow>
+                  <span className="text-[12px]">Mon 3 Mar · PM</span>
+                  <StatusDot tone="terracotta" label="OK" />
+                </ListRow>
+                <ListRow>
+                  <span className="text-[12px]">Tue 4 Mar · AM</span>
+                  <StatusDot tone="burgundy" label="No" />
+                </ListRow>
+                <ListRow>
+                  <span className="text-[12px]">Wed 5 Mar · AM</span>
+                  <StatusDot tone="ink-faint" label="Unset" />
+                </ListRow>
               </div>
-            </Card>
-            <div className="mt-1">
-              <ListRow>
-                <span className="text-[12px]">Dress Rehearsal</span>
-                <StatusDot tone="forest" label="Accepted" />
-              </ListRow>
-              <ListRow>
-                <span className="text-[12px]">Blocking Rehearsal</span>
-                <StatusDot tone="terracotta" label="Tentative" />
-              </ListRow>
-            </div>
-          </PhoneMockup>
+            </PhoneMockup>
 
-          <PhoneMockup label="Check the whole crew">
-            <p className="mb-3 text-[13px] font-bold">8 of 10 crew are free</p>
-            <ProportionBar
-              segments={[
-                { tone: "forest", label: "Free", count: 8 },
-                { tone: "terracotta", label: "Maybe", count: 1 },
-                { tone: "burgundy", label: "Not free", count: 1 },
-              ]}
-            />
-            <div className="mt-4 flex gap-1.5">
-              <Avatar name="Jordan" />
-              <Avatar name="Priya" />
-              <Avatar name="Will" />
-              <Avatar name="Sam" />
-            </div>
-          </PhoneMockup>
+            <PhoneMockup label="Track who's responded">
+              <div className="flex-1 overflow-y-auto px-4 pt-9 pb-4">
+                <h2 className="font-display mb-1 text-lg font-bold italic text-burgundy">
+                  My shoots
+                </h2>
+                <p className="mb-5 text-[11px] text-ink-soft">Verdant Hour</p>
+
+                <Card>
+                  <div className="text-[13px] font-bold">Tech Day 3</div>
+                  <div className="mt-0.5 text-[10.5px] text-ink-soft">
+                    Fri 13 March · needs your response
+                  </div>
+                </Card>
+
+                <p className="mb-1 mt-5 text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+                  Upcoming
+                </p>
+                <ListRow>
+                  <span className="text-[12px]">Dress Rehearsal</span>
+                  <StatusDot tone="forest" label="Accepted" />
+                </ListRow>
+                <ListRow>
+                  <span className="text-[12px]">Blocking Rehearsal</span>
+                  <StatusDot tone="terracotta" label="Tentative" />
+                </ListRow>
+                <ListRow>
+                  <span className="text-[12px]">Read-through</span>
+                  <StatusDot tone="ink-faint" label="Pending" />
+                </ListRow>
+                <ListRow>
+                  <span className="text-[12px]">Location Scout</span>
+                  <StatusDot tone="burgundy" label="Declined" />
+                </ListRow>
+              </div>
+            </PhoneMockup>
+
+            <PhoneMockup label="Check the whole crew">
+              <div className="flex-1 overflow-y-auto px-4 pt-9 pb-4">
+                <h2 className="font-display mb-1 text-lg font-bold italic text-burgundy">
+                  Crew availability
+                </h2>
+                <p className="mb-5 text-[11px] text-ink-soft">Tech Day 3 · Fri 14 March</p>
+
+                <p className="mb-2 text-[13px] font-bold">8 of 10 crew are free</p>
+                <ProportionBar
+                  segments={[
+                    { tone: "forest", label: "Free", count: 8 },
+                    { tone: "terracotta", label: "Maybe", count: 1 },
+                    { tone: "burgundy", label: "Not free", count: 1 },
+                  ]}
+                />
+
+                <p className="mb-1 mt-5 text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+                  Crew
+                </p>
+                {[
+                  { name: "Jordan", tone: "forest" as const, label: "Free" },
+                  { name: "Priya", tone: "forest" as const, label: "Free" },
+                  { name: "Will", tone: "terracotta" as const, label: "Maybe" },
+                  { name: "Sam", tone: "burgundy" as const, label: "Not free" },
+                ].map((c) => (
+                  <ListRow key={c.name}>
+                    <span className="flex items-center gap-2 text-[12px]">
+                      <Avatar name={c.name} />
+                      {c.name}
+                    </span>
+                    <StatusDot tone={c.tone} label={c.label} />
+                  </ListRow>
+                ))}
+              </div>
+            </PhoneMockup>
+          </div>
         </div>
       </section>
 
