@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { CenteredCard } from "@/components/ui/centered-card";
+import { NavShell } from "@/components/ui/nav";
 import { ProfileForm } from "@/components/profile/profile-form";
 import { auth } from "@/lib/auth";
 import { getProfileContext } from "@/server/profile";
@@ -16,9 +17,11 @@ export default async function ProfilePage() {
   );
 
   return (
-    <CenteredCard wide>
-      <h1 className="mb-5 text-base font-bold">Your profile</h1>
-      <ProfileForm name={user.name} phone={user.phone} membership={membership} />
-    </CenteredCard>
+    <NavShell activeHref="/profile">
+      <CenteredCard wide>
+        <h1 className="mb-5 text-base font-bold">Your profile</h1>
+        <ProfileForm name={user.name} phone={user.phone} membership={membership} />
+      </CenteredCard>
+    </NavShell>
   );
 }
