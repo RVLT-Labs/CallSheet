@@ -14,7 +14,7 @@ export default async function SettingsPage() {
   const organizationId = session.session.activeOrganizationId;
   if (!organizationId) redirect("/");
 
-  const { film, isOrganiser, organisers } = await getFilmSettingsContext(organizationId, session.user.id);
+  const { film, isOrganiser, organisers, crew } = await getFilmSettingsContext(organizationId, session.user.id);
   if (!isOrganiser) redirect("/");
 
   return (
@@ -25,7 +25,7 @@ export default async function SettingsPage() {
     >
       <CenteredCard wide>
         <h1 className="font-display mb-5 text-2xl font-bold italic text-burgundy">{film.name} settings</h1>
-        <FilmSettingsForm film={film} organisers={organisers} currentUserId={session.user.id} />
+        <FilmSettingsForm film={film} organisers={organisers} crew={crew} currentUserId={session.user.id} />
       </CenteredCard>
     </NavShell>
   );

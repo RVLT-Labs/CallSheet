@@ -73,3 +73,32 @@ export async function addOrganiser(formData: FormData) {
 
   revalidatePath("/settings");
 }
+
+export async function addCrewMember(formData: FormData) {
+  const { organizationId } = await requireActiveOrganiser();
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email) throw new Error("Email is required");
+  const role = String(formData.get("role") ?? "").trim();
+
+  const requestHeaders = await headers();
+  await auth.api.createInvitation({
+    headers: requestHeaders,
+    body: { email, role: "member", organizationId, roleTags: role ? [role] : [] },
+  });
+
+  revalidatePath("/settings");
+}
+
+export async function removeCrewMember(formData: FormData) {
+  const { organizationId } = await requireActiveOrganiser();
+  const memberId = String(formData.get("memberId") ?? "").trim();
+  if (!memberId) throw new Error("Crew member is required");
+
+  const requestHeaders = await headers();
+  await auth.api.removeMember({
+    headers: requestHeaders,
+    body: { memberIdOrEmail: memberId, organizationId },
+  });
+
+  revalidatePath("/settings");
+}
