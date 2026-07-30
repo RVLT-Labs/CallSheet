@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ComponentType, SVGProps } from "react";
+import type { ComponentType, ReactNode, SVGProps } from "react";
 
 import { cn } from "@/lib/cn";
 import { CalendarIcon, ClapperboardIcon, EnvelopeIcon, HomeIcon } from "@/components/ui/icons";
@@ -80,5 +80,21 @@ export function TopNav({ items = DEFAULT_NAV_ITEMS, activeHref }: NavProps) {
         })}
       </div>
     </nav>
+  );
+}
+
+/**
+ * The standard authenticated-page frame (issue #11) — desktop TopNav above
+ * the content, mobile BottomTabBar below it, same `activeHref` driving both.
+ * Every top-level authenticated route composes this rather than one-off
+ * rendering TopNav/BottomTabBar itself.
+ */
+export function NavShell({ activeHref, children }: { activeHref: string; children: ReactNode }) {
+  return (
+    <>
+      <TopNav activeHref={activeHref} />
+      <div className="flex flex-1 flex-col">{children}</div>
+      <BottomTabBar activeHref={activeHref} />
+    </>
   );
 }

@@ -1,15 +1,19 @@
 import { headers } from "next/headers";
 import Link from "next/link";
 
+import { AutoRefresh } from "@/components/dashboard/auto-refresh";
+import { CrewToday } from "@/components/dashboard/crew-today";
+import { OrganiserDashboard } from "@/components/dashboard/organiser-dashboard";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { FilmPicker } from "@/components/film-picker/film-picker";
 import { LandingPage } from "@/components/marketing/landing-page";
+import { NavShell } from "@/components/ui/nav";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { getAvailabilityHeatmapSummary, getOrganiserUpcomingShoots } from "@/server/dashboard";
 import { getMembershipsForUser } from "@/server/memberships";
+import { getMyShootsData } from "@/server/my-shoots";
 
-// Signed-out visitors get the public landing page (issue #31). The real
-// Today/schedule screen for signed-in crew (design system §5, spec
-// §4.4/§4.7) is built in issue #11 once auth and shoots exist to show.
 export default async function Home() {
   const session = await auth.api.getSession({ headers: await headers() });
 
@@ -20,35 +24,58 @@ export default async function Home() {
   const { active, wrapped } = await getMembershipsForUser(session.user.id);
   const activeOrganizationId = session.session.activeOrganizationId ?? null;
   const activeFilm = active.find((m) => m.organization.id === activeOrganizationId);
-  const activeFilmName = activeFilm?.organization.name ?? "Callsheet";
+
+  if (!activeFilm) {
+    return (
+      <NavShell activeHref="/">
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+          <FilmPicker
+            active={active}
+            wrapped={wrapped}
+            activeOrganizationId={activeOrganizationId}
+            activeFilmName="Callsheet"
+          />
+          <p className="max-w-sm text-sm text-ink-soft">
+            {active.length === 0 ? "Pick a film to get started." : "Pick a film above to see its schedule."}
+          </p>
+          <div className="flex items-center gap-4">
+            <Link href="/profile" className="text-[13px] font-semibold text-burgundy">
+              Edit profile
+            </Link>
+            <SignOutButton />
+          </div>
+        </div>
+      </NavShell>
+    );
+  }
+
+  const film = await prisma.organization.findUniqueOrThrow({ where: { id: activeFilm.organization.id } });
+  const isOrganiser = activeFilm.role !== "member";
+
+  if (isOrganiser) {
+    const [upcoming, heatmapDays] = await Promise.all([
+      getOrganiserUpcomingShoots(film.id),
+      film.dateRangeStart && film.dateRangeEnd
+        ? getAvailabilityHeatmapSummary(film.id, film.dateRangeStart, film.dateRangeEnd)
+        : Promise.resolve([]),
+    ]);
+
+    return (
+      <NavShell activeHref="/">
+        <OrganiserDashboard filmName={film.name} upcoming={upcoming} heatmapDays={heatmapDays} />
+        <AutoRefresh />
+      </NavShell>
+    );
+  }
+
+  const membership = await prisma.member.findUniqueOrThrow({
+    where: { organizationId_userId: { organizationId: film.id, userId: session.user.id } },
+  });
+  const { upcoming } = await getMyShootsData(membership.id, film.id, film.showTentativeToCrew);
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-      <FilmPicker
-        active={active}
-        wrapped={wrapped}
-        activeOrganizationId={activeOrganizationId}
-        activeFilmName={activeFilmName}
-      />
-      <p className="max-w-sm text-sm text-ink-soft">
-        Signed in as {session.user.email}. The Today screen lands in issue #11.
-      </p>
-      <div className="flex items-center gap-4">
-        <Link href="/profile" className="text-[13px] font-semibold text-burgundy">
-          Edit profile
-        </Link>
-        {activeFilm && (
-          <Link href="/availability" className="text-[13px] font-semibold text-burgundy">
-            My availability
-          </Link>
-        )}
-        {activeFilm && activeFilm.role !== "member" && (
-          <Link href="/settings" className="text-[13px] font-semibold text-burgundy">
-            Film settings
-          </Link>
-        )}
-        <SignOutButton />
-      </div>
-    </div>
+    <NavShell activeHref="/">
+      <CrewToday filmName={film.name} upcoming={upcoming.slice(0, 5)} />
+    </NavShell>
   );
 }

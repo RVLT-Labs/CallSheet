@@ -1,5 +1,5 @@
 import { AvailabilityGrid } from "@/components/availability/availability-grid";
-import { TopNav } from "@/components/ui/nav";
+import { NavShell } from "@/components/ui/nav";
 import { getAggregateAvailability } from "@/server/availability-grid";
 import { requireActiveOrganiserFilm } from "@/server/organiser";
 
@@ -14,20 +14,21 @@ export default async function AvailabilityGridPage({
 
   if (!film.dateRangeStart || !film.dateRangeEnd) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-        <p className="font-display text-xl font-bold italic text-burgundy">No working dates yet</p>
-        <p className="max-w-sm text-sm text-ink-soft">
-          Set {film.name}&apos;s working dates in Film Settings before viewing crew availability.
-        </p>
-      </div>
+      <NavShell activeHref="/availability">
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+          <p className="font-display text-xl font-bold italic text-burgundy">No working dates yet</p>
+          <p className="max-w-sm text-sm text-ink-soft">
+            Set {film.name}&apos;s working dates in Film Settings before viewing crew availability.
+          </p>
+        </div>
+      </NavShell>
     );
   }
 
   const crew = await getAggregateAvailability(film.id, film.dateRangeStart, film.dateRangeEnd);
 
   return (
-    <div>
-      <TopNav activeHref="/availability" />
+    <NavShell activeHref="/availability">
       <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
         <h1 className="font-display mb-1 text-2xl font-bold italic text-burgundy">Crew availability</h1>
         <p className="mb-6 text-[13px] text-ink-soft">
@@ -41,6 +42,6 @@ export default async function AvailabilityGridPage({
           requiredMembershipIds={requiredMembershipIds}
         />
       </div>
-    </div>
+    </NavShell>
   );
 }
