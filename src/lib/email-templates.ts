@@ -6,12 +6,16 @@
 
 const DISPLAY_FONT = "'Playfair Display', Georgia, 'Times New Roman', serif";
 const BODY_FONT = "'Inter', Arial, Helvetica, sans-serif";
+const MONO_FONT = "'Space Mono', 'Courier New', Courier, monospace";
 
 const COLOR = {
   cream: "#fbf6ef",
   ink: "#3a2e28",
   inkSoft: "#8a7b6e",
+  inkFaint: "#b7a996",
   burgundy: "#6e1f2a",
+  terracotta: "#b5773a",
+  forest: "#35563e",
   hairline: "#e6dbca",
   white: "#ffffff",
 };
@@ -47,6 +51,28 @@ function button(label: string, url: string, variant: "primary" | "secondary") {
 
 function dateLineHtml(dateLabel: string, halfDayLabel: string, callTime: string) {
   return `<p style="margin:0 0 4px 0;font-family:${BODY_FONT};font-size:13.5px;color:${COLOR.ink};">${dateLabel} · ${halfDayLabel} · Call ${callTime}</p>`;
+}
+
+// Same deterministic name -> color hash as the Avatar component (design system
+// §5.4), reimplemented table-based so it renders in clients without CSS gradients
+// or border-radius on flex containers.
+const AVATAR_PALETTE = [COLOR.burgundy, COLOR.terracotta, COLOR.forest, COLOR.ink];
+
+function avatarColorFor(seed: string) {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
+}
+
+function initialsFor(name: string) {
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return (first + last).toUpperCase();
+}
+
+function avatarHtml(name: string) {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;"><tr><td width="52" height="52" align="center" valign="middle" style="width:52px;height:52px;border-radius:26px;background-color:${avatarColorFor(name)};font-family:${BODY_FONT};font-size:18px;font-weight:bold;color:${COLOR.white};">${initialsFor(name)}</td></tr></table>`;
 }
 
 export type InviteEmailDay = { dateLabel: string; halfDayLabel: string; callTime: string };
@@ -159,4 +185,64 @@ export function renderReminderEmail(params: { recipientName: string; shootTitle:
   ].join("\n");
 
   return { subject: `Reminder: ${shootTitle}`, html, text };
+}
+
+export function renderMagicLinkEmail(params: { url: string }) {
+  const { url } = params;
+
+  const html = shell(`
+    <p style="margin:0 0 6px 0;font-family:${DISPLAY_FONT};font-style:italic;font-weight:bold;font-size:22px;color:${COLOR.ink};text-align:center;">Sign in to Callsheet</p>
+    <p style="margin:0 0 28px 0;font-family:${BODY_FONT};font-size:13.5px;line-height:1.6;color:${COLOR.inkSoft};text-align:center;">Tap below to sign in. This link expires shortly and only works once.</p>
+    <div style="text-align:center;margin-bottom:24px;">
+      ${button("Sign in to Callsheet", url, "primary")}
+    </div>
+    <p style="margin:0 0 8px 0;font-family:${BODY_FONT};font-size:12px;color:${COLOR.inkSoft};text-align:center;">Or paste this link into your browser:</p>
+    <p style="margin:0 0 28px 0;padding:12px 14px;background-color:${COLOR.cream};border:1px solid ${COLOR.hairline};border-radius:8px;font-family:${MONO_FONT};font-size:11.5px;line-height:1.5;color:${COLOR.ink};word-break:break-all;text-align:center;">${url}</p>
+    <p style="margin:0;padding-top:20px;border-top:1px solid ${COLOR.hairline};font-family:${BODY_FONT};font-size:11.5px;line-height:1.6;color:${COLOR.inkFaint};text-align:center;">Didn't request this? You can safely ignore this email — no changes were made to your account.</p>
+  `);
+
+  const text = [
+    "Sign in to Callsheet",
+    "Tap the link below to sign in. This link expires shortly and only works once.",
+    url,
+    "Didn't request this? You can safely ignore this email — no changes were made to your account.",
+  ].join("\n\n");
+
+  return { subject: "Your Callsheet sign-in link", html, text };
+}
+
+export function renderCrewInvitationEmail(params: {
+  inviterName: string;
+  filmName: string;
+  roleTag: string | null;
+  url: string;
+}) {
+  const { inviterName, filmName, roleTag, url } = params;
+
+  const roleHtml = roleTag
+    ? `<p style="margin:4px 0 0 0;font-family:${BODY_FONT};font-size:12.5px;color:${COLOR.inkSoft};text-transform:capitalize;text-align:center;">${roleTag}</p>`
+    : "";
+
+  const html = shell(`
+    <div style="text-align:center;margin-bottom:18px;">
+      ${avatarHtml(inviterName)}
+    </div>
+    <p style="margin:0 0 2px 0;font-family:${BODY_FONT};font-size:13.5px;color:${COLOR.inkSoft};text-align:center;">${inviterName} invited you to join</p>
+    <p style="margin:0;font-family:${DISPLAY_FONT};font-style:italic;font-weight:bold;font-size:26px;color:${COLOR.burgundy};text-align:center;">${filmName}</p>
+    ${roleHtml}
+    <div style="text-align:center;margin:28px 0 20px 0;">
+      ${button("Accept & set your availability", url, "primary")}
+    </div>
+    <p style="margin:0;padding-top:20px;border-top:1px solid ${COLOR.hairline};font-family:${BODY_FONT};font-size:11.5px;line-height:1.6;color:${COLOR.inkFaint};text-align:center;">We'll send a sign-in link to this address. Accepting logs you straight in, no password needed.</p>
+  `);
+
+  const text = [
+    `${inviterName} added you to crew on ${filmName} on Callsheet.`,
+    roleTag ?? "",
+    `Accept: ${url}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  return { subject: `You've been added to crew on ${filmName}`, html, text };
 }
