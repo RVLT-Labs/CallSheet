@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { ShootSlotSwap } from "@/components/shoots/shoot-slot-swap";
@@ -44,20 +45,21 @@ export default async function ShootsPage() {
 
       {shoots.map((shoot) => {
         const dates = [...new Set(shoot.days.map((d) => d.date.toISOString().slice(0, 10)))];
-        const requiredSlots = shoot.slots.filter((s) => s.kind === "required");
-        const generalSlots = shoot.slots.filter((s) => s.kind === "general");
+        const activeSlots = shoot.slots.filter((s) => !s.removedAt);
+        const requiredSlots = activeSlots.filter((s) => s.kind === "required");
+        const generalSlots = activeSlots.filter((s) => s.kind === "general");
 
         return (
           <div key={shoot.id} className="border-b border-hairline py-4">
-            <div className="mb-1.5 flex items-center justify-between">
+            <Link href={`/shoots/${shoot.id}`} className="mb-1.5 flex items-center justify-between">
               <p className="text-[14px] font-semibold">
-                {dates.length === 1 ? dates[0] : `${dates[0]} – ${dates[dates.length - 1]}`}
+                {shoot.title ?? (dates.length === 1 ? dates[0] : `${dates[0]} – ${dates[dates.length - 1]}`)}
               </p>
               <StatusDot
                 tone={shoot.status === "confirmed" ? "forest" : "terracotta"}
                 label={shoot.status === "confirmed" ? "Confirmed" : "Tentative"}
               />
-            </div>
+            </Link>
             <p className="mb-2 text-[12px] text-ink-soft">
               {requiredSlots.length} required · {generalSlots.length} general
             </p>
@@ -71,10 +73,6 @@ export default async function ShootsPage() {
           </div>
         );
       })}
-
-      <p className="mt-4 text-[11px] italic text-ink-faint">
-        Shoot detail, RSVP roster, and invite emails land in issues #9 and #10.
-      </p>
     </div>
   );
 }

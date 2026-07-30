@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getAvailabilityCalendarData } from "@/server/availability";
 import { parseIsoDateUtc } from "@/server/availability-rules";
+import { ensureInvitesForShoot } from "@/server/shoot-detail";
 import {
   rankCandidates,
   type CandidateSlot,
@@ -128,6 +129,8 @@ export async function createShoot(organizationId: string, input: ConfirmShootInp
     },
   });
 
+  if (input.status === "confirmed") await ensureInvitesForShoot(shoot.id);
+
   return shoot;
 }
 
@@ -136,11 +139,15 @@ export async function createShoot(organizationId: string, input: ConfirmShootInp
  * shoot (issue #8 acceptance criteria) — the slot row is updated in place.
  */
 export async function swapPlaceholderForMember(shootSlotId: string, membershipId: string) {
-  const slot = await prisma.shootSlot.findUniqueOrThrow({ where: { id: shootSlotId } });
+  const slot = await prisma.shootSlot.findUniqueOrThrow({ where: { id: shootSlotId }, include: { shoot: true } });
   if (slot.membershipId) throw new Error("Slot already holds a real crew member");
 
   await prisma.shootSlot.update({
     where: { id: shootSlotId },
     data: { membershipId, placeholderLabel: null },
   });
+
+  // A shoot that's already Confirmed already sent its invites — a newly
+  // swapped-in real person needs one too, same as everyone else on the roster.
+  if (slot.shoot.status === "confirmed") await ensureInvitesForShoot(slot.shootId);
 }
