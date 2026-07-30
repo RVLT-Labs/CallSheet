@@ -1,13 +1,17 @@
-import Link from "next/link";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
-// Stub. The real film creation flow (spec §4.2) is built in issue #5.
-export default function NewFilmPage() {
+import { CenteredCard } from "@/components/ui/centered-card";
+import { FilmCreationWizard } from "@/components/films/film-creation-wizard";
+import { auth } from "@/lib/auth";
+
+export default async function NewFilmPage() {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) redirect("/sign-in");
+
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-      <p className="text-base font-bold">Film creation lands in issue #5</p>
-      <Link href="/" className="text-[13px] font-semibold text-burgundy">
-        Back home
-      </Link>
-    </div>
+    <CenteredCard wide>
+      <FilmCreationWizard />
+    </CenteredCard>
   );
 }

@@ -50,6 +50,11 @@ export default async function Home() {
         <Link href="/profile" className="text-[13px] font-semibold text-burgundy">
           Edit profile
         </Link>
+        {activeFilm && activeFilm.role !== "member" && (
+          <Link href="/settings" className="text-[13px] font-semibold text-burgundy">
+            Film settings
+          </Link>
+        )}
         <SignOutButton />
       </div>
     </div>

@@ -34,6 +34,7 @@ export const auth = betterAuth({
       schema: {
         organization: {
           additionalFields: {
+            company: { type: "string", required: false },
             dateRangeStart: { type: "date", required: false },
             dateRangeEnd: { type: "date", required: false },
             posterUrl: { type: "string", required: false },
@@ -48,6 +49,14 @@ export const auth = betterAuth({
             roleTags: { type: "string[]", required: false, defaultValue: [] },
           },
         },
+        invitation: {
+          additionalFields: {
+            // Pre-assigned role tags (spec §4.2). Better Auth's acceptInvitation
+            // only copies organizationId/userId/role onto the new Member, so the
+            // hook below carries this across explicitly.
+            roleTags: { type: "string[]", required: false, defaultValue: [] },
+          },
+        },
       },
       sendInvitationEmail: async (data) => {
         const url = `${process.env.BETTER_AUTH_URL ?? "http://localhost:3000"}/accept-invitation/${data.id}`;
@@ -56,6 +65,14 @@ export const auth = betterAuth({
           subject: `You've been added to crew on ${data.organization.name}`,
           html: `<p>${data.inviter.user.name} added you to crew on <strong>${data.organization.name}</strong> on Callsheet.</p><p><a href="${url}">Set your availability</a></p>`,
         });
+      },
+      organizationHooks: {
+        afterAcceptInvitation: async ({ invitation, member }) => {
+          const roleTags = (invitation as { roleTags?: string[] }).roleTags;
+          if (roleTags?.length) {
+            await prisma.member.update({ where: { id: member.id }, data: { roleTags } });
+          }
+        },
       },
     }),
     // Must be last: writes the session cookie via Next.js's cookies() API.

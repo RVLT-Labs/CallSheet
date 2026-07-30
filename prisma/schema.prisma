@@ -93,6 +93,7 @@ model Organization {
   createdAt DateTime @default(now())
 
   // additionalFields — film-specific data per spec §4.2 / §6, not a parallel Film table
+  company                 String? // production company/society, e.g. "UNSW MTS" (design: style-board-v13-film-creation.html)
   dateRangeStart          DateTime?
   dateRangeEnd            DateTime?
   posterUrl               String?
@@ -139,6 +140,11 @@ model Invitation {
   expiresAt      DateTime
   inviterId      String
   createdAt      DateTime @default(now())
+
+  // additionalField — pre-assigned job-function role tags (spec §4.2: "optionally
+  // pre-assigning a role tag even in MVP"), copied onto the Member row on accept
+  // via the organizationHooks.afterAcceptInvitation hook (not automatic).
+  roleTags String[] @default([])
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
