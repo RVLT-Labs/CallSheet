@@ -41,10 +41,11 @@ export function MyShoots({ pending, upcoming, past }: { pending: MyShoot[]; upco
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-8 md:px-8">
-      <h1 className="font-display mb-6 text-2xl font-bold italic text-burgundy">My Shoots</h1>
+    <div className="mx-auto w-full max-w-4xl px-4 py-8 md:px-8">
+      <h1 className="font-display mb-6 text-2xl font-bold italic text-burgundy md:text-3xl">My Shoots</h1>
 
       {soonest && (
+        <div className="md:max-w-md">
         <Card>
           <p className="mb-1 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Needs your response</p>
           <p className="mb-1 text-[15px] font-semibold">{soonest.title ?? "Shoot"}</p>
@@ -79,6 +80,7 @@ export function MyShoots({ pending, upcoming, past }: { pending: MyShoot[]; upco
             </button>
           )}
         </Card>
+        </div>
       )}
 
       <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Needs your response">
@@ -122,23 +124,25 @@ export function MyShoots({ pending, upcoming, past }: { pending: MyShoot[]; upco
       <div className="mt-8">
         <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Upcoming</p>
         {upcoming.length === 0 && <p className="text-[13px] text-ink-soft">Nothing scheduled yet.</p>}
-        {upcoming.map((shoot) => (
-          <Link
-            key={shoot.id}
-            href={`/shoots/${shoot.id}`}
-            className="flex items-center justify-between border-b border-hairline py-3 text-left last:border-b-0"
-          >
-            <div>
-              <p className="text-[13.5px] font-medium">{shoot.title ?? "Shoot"}</p>
-              <p className="text-[12px] text-ink-soft">{dateLabel(shoot.dateIsos)}</p>
-            </div>
-            {shoot.status === "tentative" ? (
-              <span className="text-[12px] italic text-terracotta">Hold, not booked</span>
-            ) : shoot.inviteStatus ? (
-              <StatusDot tone={INVITE_TONE[shoot.inviteStatus]} label={INVITE_LABEL[shoot.inviteStatus]} />
-            ) : null}
-          </Link>
-        ))}
+        <div className="md:grid md:grid-cols-2 md:gap-x-10">
+          {upcoming.map((shoot) => (
+            <Link
+              key={shoot.id}
+              href={`/shoots/${shoot.id}`}
+              className="flex items-center justify-between border-b border-hairline py-3 text-left last:border-b-0"
+            >
+              <div>
+                <p className="text-[13.5px] font-medium">{shoot.title ?? "Shoot"}</p>
+                <p className="text-[12px] text-ink-soft">{dateLabel(shoot.dateIsos)}</p>
+              </div>
+              {shoot.status === "tentative" ? (
+                <span className="text-[12px] italic text-terracotta">Hold, not booked</span>
+              ) : shoot.inviteStatus ? (
+                <StatusDot tone={INVITE_TONE[shoot.inviteStatus]} label={INVITE_LABEL[shoot.inviteStatus]} />
+              ) : null}
+            </Link>
+          ))}
+        </div>
       </div>
 
       {past.length > 0 && (
@@ -150,15 +154,18 @@ export function MyShoots({ pending, upcoming, past }: { pending: MyShoot[]; upco
           >
             {pastOpen ? "Hide" : "Show"} past ({past.length})
           </button>
-          {pastOpen &&
-            past.map((shoot) => (
-              <div key={shoot.id} className="flex items-center justify-between border-b border-hairline py-3 text-ink-faint">
-                <div>
-                  <p className="text-[13.5px]">{shoot.title ?? "Shoot"}</p>
-                  <p className="text-[12px]">{dateLabel(shoot.dateIsos)}</p>
+          {pastOpen && (
+            <div className="md:grid md:grid-cols-2 md:gap-x-10">
+              {past.map((shoot) => (
+                <div key={shoot.id} className="flex items-center justify-between border-b border-hairline py-3 text-ink-faint">
+                  <div>
+                    <p className="text-[13.5px]">{shoot.title ?? "Shoot"}</p>
+                    <p className="text-[12px]">{dateLabel(shoot.dateIsos)}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

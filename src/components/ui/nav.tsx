@@ -28,7 +28,7 @@ type NavProps = {
  */
 export function BottomTabBar({ items = DEFAULT_NAV_ITEMS, activeHref }: NavProps) {
   return (
-    <nav className="flex justify-around border-t border-hairline bg-cream py-3 md:hidden">
+    <nav className="flex justify-around border-t border-hairline bg-cream pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 md:hidden">
       {items.map((item) => {
         const active = item.href === activeHref;
         const Icon = item.icon;

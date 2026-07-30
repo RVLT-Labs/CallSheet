@@ -49,7 +49,7 @@ export default async function AvailabilityPage() {
       <div className="mx-auto w-full max-w-3xl px-4 py-8 md:px-8">
         <div className="mb-6 flex items-baseline justify-between">
           <div>
-            <h1 className="font-display mb-1 text-2xl font-bold italic text-burgundy">Your availability</h1>
+            <h1 className="font-display mb-1 text-2xl font-bold italic text-burgundy md:text-3xl">Your availability</h1>
             <p className="text-[13px] text-ink-soft">
               {film.name} · {film.dateRangeStart.toISOString().slice(0, 10)} to{" "}
               {film.dateRangeEnd.toISOString().slice(0, 10)}
