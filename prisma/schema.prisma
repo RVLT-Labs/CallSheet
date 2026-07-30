@@ -221,6 +221,7 @@ model Shoot {
   id              String      @id @default(cuid())
   filmId          String
   status          ShootStatus @default(tentative)
+  title           String? // organiser-set label for the header stack (design: v17-shoot-detail-clean); falls back to the date range when unset
   locationAddress String?
   locationMapUrl  String?
   locationNotes   String? // parking, nearest hospital, etc — free text for now (spec §4.6)
@@ -264,6 +265,7 @@ model ShootSlot {
   kind             ShootSlotKind
   membershipId     String?
   placeholderLabel String? // e.g. "TBD Boom Op" — used when membershipId is null
+  removedAt        DateTime? // set instead of deleting when the person already has an RSVP response, so history is preserved (issue #9 acceptance criteria); slots removed before ever responding are deleted outright instead
 
   shoot      Shoot   @relation(fields: [shootId], references: [id], onDelete: Cascade)
   membership Member? @relation(fields: [membershipId], references: [id], onDelete: Cascade)

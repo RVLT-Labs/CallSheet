@@ -378,7 +378,7 @@ export function ShootPlanningWizard({
       <StepDots step={4} />
       <h2 className="font-display mb-1 text-xl font-bold italic text-burgundy">Confirm</h2>
       <p className="mb-5 text-[12.5px] text-ink-soft">
-        Tentative holds the date with no roster yet. Confirmed sends invites once issue #10 ships.
+        Tentative holds the date with no roster yet. Confirmed sends invites to everyone required or in.
       </p>
 
       {selected && (
