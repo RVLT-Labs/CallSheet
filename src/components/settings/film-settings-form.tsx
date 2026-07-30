@@ -50,7 +50,7 @@ export function FilmSettingsForm({ film, organisers, crew, currentUserId }: Film
           <TextField name="title" label="Title" defaultValue={film.name} disabled={isWrapped} required />
           <TextField
             name="company"
-            label="Company / society"
+            label="Production company"
             defaultValue={film.company ?? ""}
             disabled={isWrapped}
           />

@@ -94,7 +94,7 @@ model Organization {
   createdAt DateTime @default(now())
 
   // additionalFields — film-specific data per spec §4.2 / §6, not a parallel Film table
-  company                 String? // production company/society, e.g. "UNSW MTS" (design: style-board-v13-film-creation.html)
+  company                 String? // production company, e.g. "Late Bloom Pictures" (design: style-board-v13-film-creation.html)
   dateRangeStart          DateTime?
   dateRangeEnd            DateTime?
   posterUrl               String?

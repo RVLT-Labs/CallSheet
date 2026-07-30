@@ -127,7 +127,7 @@ export function RecurringRuleForm({
       <div className="mt-5">
         <TextField
           label="Label (optional)"
-          placeholder="e.g. Weekly rehearsal"
+          placeholder="e.g. Tuesday night class"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
         />
