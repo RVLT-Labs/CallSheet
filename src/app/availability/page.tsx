@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AvailabilityCalendar } from "@/components/availability/availability-calendar";
@@ -42,11 +43,20 @@ export default async function AvailabilityPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8 md:px-8">
-      <h1 className="font-display mb-1 text-2xl font-bold italic text-burgundy">Your availability</h1>
-      <p className="mb-6 text-[13px] text-ink-soft">
-        {film.name} · {film.dateRangeStart.toISOString().slice(0, 10)} to{" "}
-        {film.dateRangeEnd.toISOString().slice(0, 10)}
-      </p>
+      <div className="mb-6 flex items-baseline justify-between">
+        <div>
+          <h1 className="font-display mb-1 text-2xl font-bold italic text-burgundy">Your availability</h1>
+          <p className="text-[13px] text-ink-soft">
+            {film.name} · {film.dateRangeStart.toISOString().slice(0, 10)} to{" "}
+            {film.dateRangeEnd.toISOString().slice(0, 10)}
+          </p>
+        </div>
+        {membership.role !== "member" && (
+          <Link href="/availability/grid" className="text-[13px] font-semibold text-burgundy">
+            Crew availability grid
+          </Link>
+        )}
+      </div>
       <AvailabilityCalendar
         windowStart={film.dateRangeStart.toISOString().slice(0, 10)}
         windowEnd={film.dateRangeEnd.toISOString().slice(0, 10)}
