@@ -8,14 +8,16 @@ export type NavItem = {
   label: string;
   href: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
+  /** Anchor id for the dashboard product tour (product-tour.tsx) — omitted where a step doesn't target this item. */
+  tourId?: string;
 };
 
 // Comms (bulk messaging, issue #15) isn't built yet — left out of the nav
 // until the route exists rather than linking somewhere that 404s.
 export const DEFAULT_NAV_ITEMS: NavItem[] = [
   { label: "Today", href: "/", icon: HomeIcon },
-  { label: "Availability", href: "/availability", icon: CalendarIcon },
-  { label: "Shoots", href: "/shoots", icon: ClapperboardIcon },
+  { label: "Availability", href: "/availability", icon: CalendarIcon, tourId: "nav-availability" },
+  { label: "Shoots", href: "/shoots", icon: ClapperboardIcon, tourId: "nav-shoots" },
 ];
 
 type NavProps = {
@@ -38,6 +40,7 @@ export function BottomTabBar({ items = DEFAULT_NAV_ITEMS, activeHref }: NavProps
             key={item.href}
             href={item.href}
             aria-current={active ? "page" : undefined}
+            data-tour={item.tourId}
             className="flex flex-col items-center gap-1"
           >
             <Icon
@@ -72,6 +75,7 @@ export function TopNav({ items = DEFAULT_NAV_ITEMS, activeHref }: NavProps) {
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
+              data-tour={item.tourId}
               className={cn(
                 "border-b-2 pb-1 text-sm font-semibold",
                 active ? "border-burgundy text-ink" : "border-transparent text-ink-soft",

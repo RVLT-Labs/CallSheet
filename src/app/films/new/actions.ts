@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
 
 export type CreateFilmInvite = { email: string; role?: string };
@@ -23,6 +24,8 @@ export async function createFilm(input: CreateFilmInput) {
 
   if (!input.title.trim()) throw new Error("Title is required");
 
+  const priorMemberships = await prisma.member.count({ where: { userId: session.user.id } });
+
   const organization = await auth.api.createOrganization({
     headers: requestHeaders,
     body: {
@@ -36,6 +39,12 @@ export async function createFilm(input: CreateFilmInput) {
   });
 
   if (!organization) throw new Error("Could not create film");
+
+  // First film ever = onboarding done, whether this ran from the self-signup
+  // welcome flow or the regular "create a new film" entry point.
+  if (priorMemberships === 0) {
+    await prisma.user.update({ where: { id: session.user.id }, data: { onboardedAt: new Date() } });
+  }
 
   for (const invite of input.invites) {
     await auth.api.createInvitation({

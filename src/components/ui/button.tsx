@@ -16,6 +16,8 @@ const variantClasses: Record<Variant, string> = {
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
   href?: string;
+  /** Anchor id for the dashboard product tour (product-tour.tsx). */
+  "data-tour"?: string;
 };
 
 /**
@@ -27,17 +29,18 @@ export function Button({
   variant = "primary",
   className,
   href,
+  "data-tour": dataTour,
   ...props
 }: ButtonProps) {
   const classes = cn(variantClasses[variant], className);
 
   if (href) {
     return (
-      <Link href={href} className={classes}>
+      <Link href={href} className={classes} data-tour={dataTour}>
         {props.children}
       </Link>
     );
   }
 
-  return <button className={classes} {...props} />;
+  return <button className={classes} data-tour={dataTour} {...props} />;
 }

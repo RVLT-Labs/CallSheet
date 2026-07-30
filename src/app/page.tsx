@@ -1,10 +1,12 @@
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { CrewToday } from "@/components/dashboard/crew-today";
 import { OrganiserDashboard } from "@/components/dashboard/organiser-dashboard";
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { DashboardTour } from "@/components/onboarding/dashboard-tour";
 import { FilmPicker } from "@/components/film-picker/film-picker";
 import { LandingPage } from "@/components/marketing/landing-page";
 import { NavShell } from "@/components/ui/nav";
@@ -14,7 +16,11 @@ import { getOrganiserUpcomingShoots } from "@/server/dashboard";
 import { getMembershipsForUser } from "@/server/memberships";
 import { getMyShootsData } from "@/server/my-shoots";
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ tour?: string }>;
+}) {
   const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session) {
@@ -26,6 +32,16 @@ export default async function Home() {
   const activeFilm = active.find((m) => m.organization.id === activeOrganizationId);
 
   if (!activeFilm) {
+    // Self-signup (no invite): zero films, never onboarded — collect their
+    // name and get their first film made before dropping them here.
+    if (active.length === 0 && wrapped.length === 0) {
+      const user = await prisma.user.findUniqueOrThrow({
+        where: { id: session.user.id },
+        select: { onboardedAt: true },
+      });
+      if (!user.onboardedAt) redirect("/welcome");
+    }
+
     return (
       <NavShell activeHref="/">
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
@@ -54,11 +70,13 @@ export default async function Home() {
 
   if (isOrganiser) {
     const upcoming = await getOrganiserUpcomingShoots(film.id);
+    const { tour } = await searchParams;
 
     return (
       <NavShell activeHref="/">
         <OrganiserDashboard filmName={film.name} upcoming={upcoming} />
         <AutoRefresh />
+        {tour === "1" && <DashboardTour />}
       </NavShell>
     );
   }

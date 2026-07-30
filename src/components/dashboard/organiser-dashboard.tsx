@@ -65,11 +65,16 @@ export function OrganiserDashboard({
             <Link href="/availability" className="text-[13px] font-semibold text-burgundy">
               My availability
             </Link>
-            <Link href="/availability/grid" className="text-[13px] font-semibold text-burgundy">
+            <Link href="/availability/grid" data-tour="quick-crew-grid" className="text-[13px] font-semibold text-burgundy">
               Crew availability grid
             </Link>
           </div>
-          <Button href="/shoots/new" variant="primary" className="mt-4 block w-full text-center">
+          <Button
+            href="/shoots/new"
+            variant="primary"
+            data-tour="quick-plan-shoot"
+            className="mt-4 block w-full text-center"
+          >
             Plan a shoot
           </Button>
         </div>
