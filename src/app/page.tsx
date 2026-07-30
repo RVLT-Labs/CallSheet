@@ -7,7 +7,7 @@ import { OrganiserDashboard } from "@/components/dashboard/organiser-dashboard";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { FilmPicker } from "@/components/film-picker/film-picker";
 import { LandingPage } from "@/components/marketing/landing-page";
-import { NavShell } from "@/components/ui/nav";
+import { NavShell } from "@/components/ui/nav-shell";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getOrganiserUpcomingShoots } from "@/server/dashboard";
@@ -27,7 +27,7 @@ export default async function Home() {
 
   if (!activeFilm) {
     return (
-      <NavShell activeHref="/" user={{ name: session.user.name }}>
+      <NavShell activeHref="/" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={activeOrganizationId}>
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
           <FilmPicker
             active={active}
@@ -56,7 +56,7 @@ export default async function Home() {
     const upcoming = await getOrganiserUpcomingShoots(film.id);
 
     return (
-      <NavShell activeHref="/" user={{ name: session.user.name }}>
+      <NavShell activeHref="/" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={activeOrganizationId}>
         <OrganiserDashboard filmName={film.name} upcoming={upcoming} />
         <AutoRefresh />
       </NavShell>
@@ -69,7 +69,7 @@ export default async function Home() {
   const { upcoming } = await getMyShootsData(membership.id, film.id, film.showTentativeToCrew);
 
   return (
-    <NavShell activeHref="/" user={{ name: session.user.name }}>
+    <NavShell activeHref="/" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={activeOrganizationId}>
       <CrewToday filmName={film.name} upcoming={upcoming.slice(0, 5)} />
     </NavShell>
   );

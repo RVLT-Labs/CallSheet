@@ -1,5 +1,5 @@
 import { AvailabilityGrid } from "@/components/availability/availability-grid";
-import { NavShell } from "@/components/ui/nav";
+import { NavShell } from "@/components/ui/nav-shell";
 import { PageShell } from "@/components/ui/page-shell";
 import { getAggregateAvailability } from "@/server/availability-grid";
 import { requireActiveOrganiserFilm } from "@/server/organiser";
@@ -9,13 +9,17 @@ export default async function AvailabilityGridPage({
 }: {
   searchParams: Promise<{ required?: string }>;
 }) {
-  const { session, film } = await requireActiveOrganiserFilm();
+  const { session, organizationId, film } = await requireActiveOrganiserFilm();
   const { required } = await searchParams;
   const requiredMembershipIds = required ? required.split(",").filter(Boolean) : [];
 
   if (!film.dateRangeStart || !film.dateRangeEnd) {
     return (
-      <NavShell activeHref="/availability" user={{ name: session.user.name }}>
+      <NavShell
+        activeHref="/availability"
+        user={{ id: session.user.id, name: session.user.name }}
+        activeOrganizationId={organizationId}
+      >
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
           <p className="font-display text-xl font-bold italic text-burgundy">No working dates yet</p>
           <p className="max-w-sm text-sm text-ink-soft">
@@ -29,7 +33,11 @@ export default async function AvailabilityGridPage({
   const crew = await getAggregateAvailability(film.id, film.dateRangeStart, film.dateRangeEnd);
 
   return (
-    <NavShell activeHref="/availability" user={{ name: session.user.name }}>
+    <NavShell
+      activeHref="/availability"
+      user={{ id: session.user.id, name: session.user.name }}
+      activeOrganizationId={organizationId}
+    >
       <PageShell maxWidth="max-w-7xl">
         <h1 className="font-display mb-1 text-2xl font-bold italic text-burgundy md:text-3xl">Crew availability</h1>
         <p className="mb-6 text-[13px] text-ink-soft">
