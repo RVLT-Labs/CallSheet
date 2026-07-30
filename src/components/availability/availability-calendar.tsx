@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useOptimistic, useState, useTransition } from "react";
 
+import { ErrorToast } from "@/components/ui/error-toast";
 import { OptGroup } from "@/components/ui/opt-group";
 import { ChevronRightIcon } from "@/components/ui/icons";
 import { CalendarCell, DayCell, type HalfDayState } from "@/components/availability/day-cell";
@@ -11,6 +12,21 @@ import { setBulkTier, setDayTier } from "@/app/availability/actions";
 import { parseIsoDateUtc, toIsoDate, utcDate } from "@/server/availability-rules";
 
 type DayCellData = { dateIso: string; am: HalfDayState; pm: HalfDayState };
+
+function applyTierUpdate(
+  state: DayCellData[],
+  updates: { dateIso: string; halfDay: "AM" | "PM"; tier: Tier }[],
+): DayCellData[] {
+  const byIso = new Map(state.map((d) => [d.dateIso, d]));
+  for (const { dateIso, halfDay, tier } of updates) {
+    const existing = byIso.get(dateIso) ?? { dateIso, am: null, pm: null };
+    byIso.set(dateIso, {
+      ...existing,
+      [halfDay === "AM" ? "am" : "pm"]: { tier, source: "manual" as const, ruleLabel: null },
+    });
+  }
+  return [...byIso.values()];
+}
 
 type AvailabilityCalendarProps = {
   windowStart: string;
@@ -48,9 +64,11 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
   const [dragging, setDragging] = useState(false);
   const [dragStartedFresh, setDragStartedFresh] = useState(true);
   const [bulkSelection, setBulkSelection] = useState<{ dateIso: string; halfDay: "AM" | "PM" }[] | null>(null);
-  const [pending, setPending] = useState(false);
+  const [optimisticDays, applyOptimisticDays] = useOptimistic(days, applyTierUpdate);
+  const [isSaving, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
-  const daysByIso = useMemo(() => new Map(days.map((d) => [d.dateIso, d])), [days]);
+  const daysByIso = useMemo(() => new Map(optimisticDays.map((d) => [d.dateIso, d])), [optimisticDays]);
 
   const weeks = useMemo(
     () => buildMonthWeeks(viewYear, viewMonth, windowStart, windowEnd),
@@ -119,19 +137,31 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
     setSelectedDate(null);
   }
 
-  async function applyBulkTier(tier: Tier) {
+  function applyBulkTier(tier: Tier) {
     if (!bulkSelection) return;
-    setPending(true);
-    await setBulkTier(bulkSelection, tier);
-    setPending(false);
+    const cells = bulkSelection;
     setBulkSelection(null);
+    startTransition(async () => {
+      applyOptimisticDays(cells.map((c) => ({ ...c, tier })));
+      try {
+        await setBulkTier(cells, tier);
+      } catch {
+        setError("Couldn't save your availability. Try again.");
+      }
+    });
   }
 
-  async function applyDayTier(halfDay: "AM" | "PM", tier: Tier) {
+  function applyDayTier(halfDay: "AM" | "PM", tier: Tier) {
     if (!selectedDate) return;
-    setPending(true);
-    await setDayTier(selectedDate, halfDay, tier);
-    setPending(false);
+    const dateIso = selectedDate;
+    startTransition(async () => {
+      applyOptimisticDays([{ dateIso, halfDay, tier }]);
+      try {
+        await setDayTier(dateIso, halfDay, tier);
+      } catch {
+        setError("Couldn't save your availability. Try again.");
+      }
+    });
   }
 
   const selectedDay = selectedDate ? daysByIso.get(selectedDate) : undefined;
@@ -168,7 +198,7 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
         </button>
       </div>
 
-      {days.length === 0 && rules.length === 0 && (
+      {optimisticDays.length === 0 && rules.length === 0 && (
         <p className="mb-3 text-[12.5px] text-ink-soft">
           Nothing set yet. Tap a day below to mark yourself Best, OK, or Unavailable.
         </p>
@@ -237,7 +267,7 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
               Cancel
             </button>
           </div>
-          {pending && <p className="mt-2 text-[11px] italic text-ink-faint">Saving…</p>}
+          {isSaving && <p className="mt-2 text-[11px] italic text-ink-faint">Saving…</p>}
         </div>
       )}
 
@@ -289,13 +319,15 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
               />
             </div>
           </div>
-          {pending && <p className="mt-2 text-[11px] italic text-ink-faint">Saving…</p>}
+          {isSaving && <p className="mt-2 text-[11px] italic text-ink-faint">Saving…</p>}
         </div>
       )}
 
       <div className="mt-8 border-t border-hairline pt-6">
         <RecurringRulesSection rules={rules} windowStart={windowStart} windowEnd={windowEnd} />
       </div>
+
+      <ErrorToast message={error} onDismiss={() => setError(null)} />
     </div>
   );
 }

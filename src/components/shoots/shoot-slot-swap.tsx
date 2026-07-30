@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 
 import { assignCrewToSlot } from "@/app/shoots/actions";
+import { ErrorToast } from "@/components/ui/error-toast";
 
 type ShootSlotSwapProps = {
   slotId: string;
@@ -13,13 +14,36 @@ type ShootSlotSwapProps = {
 /** Reassigns a placeholder slot to a real crew member in place (issue #8 acceptance criteria). */
 export function ShootSlotSwap({ slotId, label, crew }: ShootSlotSwapProps) {
   const [selected, setSelected] = useState("");
-  const [pending, setPending] = useState(false);
+  const [optimisticAssignee, setOptimisticAssignee] = useOptimistic<string | null, string>(
+    null,
+    (_state, name) => name,
+  );
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
-  async function handleAssign() {
+  function handleAssign() {
     if (!selected) return;
-    setPending(true);
-    await assignCrewToSlot(slotId, selected);
-    setPending(false);
+    const membershipId = selected;
+    const name = crew.find((c) => c.membershipId === membershipId)?.name ?? "";
+    startTransition(async () => {
+      setOptimisticAssignee(name);
+      try {
+        await assignCrewToSlot(slotId, membershipId);
+      } catch {
+        setError("Couldn't assign that slot. Try again.");
+      }
+    });
+  }
+
+  if (optimisticAssignee) {
+    return (
+      <div className="flex items-center gap-2.5 py-1.5 text-[12px] text-ink-soft">
+        <span>
+          {label} → {optimisticAssignee}
+        </span>
+        <ErrorToast message={error} onDismiss={() => setError(null)} />
+      </div>
+    );
   }
 
   return (
@@ -37,9 +61,10 @@ export function ShootSlotSwap({ slotId, label, crew }: ShootSlotSwapProps) {
           </option>
         ))}
       </select>
-      <button type="button" onClick={handleAssign} disabled={!selected || pending} className="font-semibold text-burgundy">
-        {pending ? "Assigning…" : "Assign"}
+      <button type="button" onClick={handleAssign} disabled={!selected || isPending} className="font-semibold text-burgundy">
+        {isPending ? "Assigning…" : "Assign"}
       </button>
+      <ErrorToast message={error} onDismiss={() => setError(null)} />
     </div>
   );
 }

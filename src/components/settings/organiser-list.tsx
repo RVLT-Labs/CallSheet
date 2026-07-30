@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 
 import { Avatar } from "@/components/ui/avatar";
+import { ErrorToast } from "@/components/ui/error-toast";
 import { addOrganiser } from "@/app/settings/actions";
 
 type Organiser = { id: string; user: { id: string; name: string } };
@@ -10,17 +11,30 @@ type Organiser = { id: string; user: { id: string; name: string } };
 export function OrganiserList({ organisers, currentUserId }: { organisers: Organiser[]; currentUserId: string }) {
   const [adding, setAdding] = useState(false);
   const [email, setEmail] = useState("");
-  const [pending, setPending] = useState(false);
+  const [invitedEmails, setInvitedEmails] = useState<string[]>([]);
+  const [optimisticInvites, addOptimisticInvite] = useOptimistic(invitedEmails, (state, invitedEmail: string) => [
+    ...state,
+    invitedEmail,
+  ]);
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
-  async function handleAdd() {
-    if (!email.trim()) return;
-    setPending(true);
-    const formData = new FormData();
-    formData.set("email", email.trim());
-    await addOrganiser(formData);
-    setPending(false);
+  function handleAdd() {
+    const trimmed = email.trim();
+    if (!trimmed) return;
     setEmail("");
     setAdding(false);
+    startTransition(async () => {
+      addOptimisticInvite(trimmed);
+      try {
+        const formData = new FormData();
+        formData.set("email", trimmed);
+        await addOrganiser(formData);
+        setInvitedEmails((prev) => [...prev, trimmed]);
+      } catch {
+        setError(`Couldn't invite ${trimmed}. Try again.`);
+      }
+    });
   }
 
   return (
@@ -30,6 +44,14 @@ export function OrganiserList({ organisers, currentUserId }: { organisers: Organ
           <Avatar name={o.user.name} />
           <span className="flex-1 text-[13px] font-medium">{o.user.name}</span>
           <span className="text-[11px] text-ink-soft">{o.user.id === currentUserId ? "You" : "Organiser"}</span>
+        </div>
+      ))}
+
+      {optimisticInvites.map((invitedEmail) => (
+        <div key={invitedEmail} className="flex items-center gap-2.5 border-b border-hairline py-2.5">
+          <Avatar name={invitedEmail} />
+          <span className="flex-1 text-[13px] font-medium text-ink-soft">{invitedEmail}</span>
+          <span className="text-[11px] text-ink-soft">Invited</span>
         </div>
       ))}
 
@@ -44,8 +66,8 @@ export function OrganiserList({ organisers, currentUserId }: { organisers: Organ
             placeholder="Email address"
             className="flex-1 border-0 border-b-[1.5px] border-hairline bg-transparent py-1.5 text-[13px] placeholder:text-ink-faint focus:border-burgundy focus:outline-none"
           />
-          <button type="button" onClick={handleAdd} disabled={pending} className="text-[12px] font-semibold text-burgundy">
-            {pending ? "Inviting…" : "Invite"}
+          <button type="button" onClick={handleAdd} disabled={isPending} className="text-[12px] font-semibold text-burgundy">
+            Invite
           </button>
         </div>
       ) : (
@@ -57,6 +79,8 @@ export function OrganiserList({ organisers, currentUserId }: { organisers: Organ
           + Add an organiser
         </button>
       )}
+
+      <ErrorToast message={error} onDismiss={() => setError(null)} />
     </div>
   );
 }
