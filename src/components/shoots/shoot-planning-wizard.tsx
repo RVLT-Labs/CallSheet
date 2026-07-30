@@ -52,6 +52,7 @@ export function ShootPlanningWizard({
   windowEnd: string;
 }) {
   const [step, setStep] = useState<Step>(1);
+  const [crewSearch, setCrewSearch] = useState("");
 
   const [crewState, setCrewState] = useState<Record<string, CrewState>>(() =>
     Object.fromEntries(crew.map((c) => [c.membershipId, "off" as CrewState])),
@@ -147,17 +148,28 @@ export function ShootPlanningWizard({
           Required people gate which dates can even be suggested. Everyone else is shown as a ratio only.
         </p>
 
-        {crew.map((c) => (
-          <ListRow key={c.membershipId}>
-            <span className="text-[13px] font-medium">{c.name}</span>
-            <OptGroup
-              aria-label={`${c.name} status`}
-              options={CREW_STATE_OPTIONS}
-              value={crewState[c.membershipId] ?? "off"}
-              onChange={(value) => setCrewState((prev) => ({ ...prev, [c.membershipId]: value }))}
-            />
-          </ListRow>
-        ))}
+        {crew.length > 6 && (
+          <TextField
+            label="Search crew"
+            placeholder="Name…"
+            value={crewSearch}
+            onChange={(e) => setCrewSearch(e.target.value)}
+          />
+        )}
+
+        {crew
+          .filter((c) => c.name.toLowerCase().includes(crewSearch.trim().toLowerCase()))
+          .map((c) => (
+            <ListRow key={c.membershipId}>
+              <span className="text-[13px] font-medium">{c.name}</span>
+              <OptGroup
+                aria-label={`${c.name} status`}
+                options={CREW_STATE_OPTIONS}
+                value={crewState[c.membershipId] ?? "off"}
+                onChange={(value) => setCrewState((prev) => ({ ...prev, [c.membershipId]: value }))}
+              />
+            </ListRow>
+          ))}
 
         <p className="mb-2 mt-6 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">
           Placeholder slots
