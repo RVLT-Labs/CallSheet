@@ -3,31 +3,18 @@ import Link from "next/link";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { FilmPicker } from "@/components/film-picker/film-picker";
+import { LandingPage } from "@/components/marketing/landing-page";
 import { auth } from "@/lib/auth";
 import { getMembershipsForUser } from "@/server/memberships";
 
-// Stub home page. The real Today/schedule screen (design system §5, spec
+// Signed-out visitors get the public landing page (issue #31). The real
+// Today/schedule screen for signed-in crew (design system §5, spec
 // §4.4/§4.7) is built in issue #11 once auth and shoots exist to show.
 export default async function Home() {
   const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-        <span className="font-display text-4xl font-bold italic text-burgundy">Callsheet</span>
-        <p className="max-w-sm text-sm text-ink-soft">
-          The Today screen lands in issue #11. In the meantime, see the{" "}
-          <Link href="/design-system" className="font-semibold text-burgundy">
-            component library
-          </Link>{" "}
-          or{" "}
-          <Link href="/sign-in" className="font-semibold text-burgundy">
-            sign in
-          </Link>
-          .
-        </p>
-      </div>
-    );
+    return <LandingPage />;
   }
 
   const { active, wrapped } = await getMembershipsForUser(session.user.id);
