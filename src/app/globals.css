@@ -1,26 +1,30 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * Design tokens — see callsheet-design-system.md (issue #2). Do not add
+ * colors/fonts outside this set; that document is the source of truth.
+ */
+@theme {
+  --color-cream: #fbf6ef;
+  --color-cream-deep: #f3eadc;
+  --color-ink: #3a2e28;
+  --color-ink-soft: #8a7b6e;
+  --color-ink-faint: #b7a996;
+  --color-burgundy: #6e1f2a;
+  --color-terracotta: #b5773a;
+  --color-forest: #35563e;
+  --color-taupe: #dcd2c3;
+  --color-hairline: #e6dbca;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --font-sans: var(--font-inter), "Inter", sans-serif;
+  --font-display: var(--font-playfair), "Playfair Display", serif;
+  --font-mono: var(--font-space-mono), "Space Mono", monospace;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
 }
