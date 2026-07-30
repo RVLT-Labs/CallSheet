@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { NavShell } from "@/components/ui/nav";
+import { NavShell } from "@/components/ui/nav-shell";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getWrapSummary } from "@/server/wrap-summary";
@@ -29,7 +29,7 @@ export default async function WrappedPage() {
   const { shootsCount, crewCount, acceptanceRate } = await getWrapSummary(organizationId);
 
   return (
-    <NavShell activeHref="/wrapped">
+    <NavShell activeHref="/wrapped" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={organizationId}>
       <div className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center px-6 py-16 text-center">
         <p className="mb-1 text-[13px] text-ink-soft">{film.name}</p>
         <h1 className="font-display mb-2 text-3xl font-bold italic text-burgundy">That&apos;s a wrap.</h1>

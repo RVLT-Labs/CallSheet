@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
-import { NavShell } from "@/components/ui/nav";
+import { NavShell } from "@/components/ui/nav-shell";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { toIsoDate } from "@/server/availability-rules";
@@ -73,7 +73,7 @@ export default async function ShootDetailPage({ params }: { params: Promise<{ id
   };
 
   return (
-    <NavShell activeHref="/shoots">
+    <NavShell activeHref="/shoots" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={organizationId}>
       <ShootDetailView shoot={data} isOrganiser={isOrganiser} />
     </NavShell>
   );

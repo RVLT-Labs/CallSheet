@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AvailabilityCalendar } from "@/components/availability/availability-calendar";
-import { NavShell } from "@/components/ui/nav";
+import { NavShell } from "@/components/ui/nav-shell";
 import { PageShell } from "@/components/ui/page-shell";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -27,7 +27,7 @@ export default async function AvailabilityPage() {
 
   if (!film.dateRangeStart || !film.dateRangeEnd) {
     return (
-      <NavShell activeHref="/availability">
+      <NavShell activeHref="/availability" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={organizationId}>
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
           <p className="font-display text-xl font-bold italic text-burgundy">No working dates yet</p>
           <p className="max-w-sm text-sm text-ink-soft">
@@ -46,7 +46,7 @@ export default async function AvailabilityPage() {
   );
 
   return (
-    <NavShell activeHref="/availability">
+    <NavShell activeHref="/availability" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={organizationId}>
       <PageShell maxWidth="max-w-5xl">
         <div className="mb-6 flex items-baseline justify-between">
           <div>

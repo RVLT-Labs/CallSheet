@@ -9,7 +9,7 @@ import { SignOutButton } from "@/components/auth/sign-out-button";
 import { DashboardTour } from "@/components/onboarding/dashboard-tour";
 import { FilmPicker } from "@/components/film-picker/film-picker";
 import { LandingPage } from "@/components/marketing/landing-page";
-import { NavShell } from "@/components/ui/nav";
+import { NavShell } from "@/components/ui/nav-shell";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getOrganiserUpcomingShoots } from "@/server/dashboard";
@@ -43,7 +43,7 @@ export default async function Home({
     }
 
     return (
-      <NavShell activeHref="/">
+      <NavShell activeHref="/" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={activeOrganizationId}>
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
           <FilmPicker
             active={active}
@@ -73,7 +73,7 @@ export default async function Home({
     const { tour } = await searchParams;
 
     return (
-      <NavShell activeHref="/">
+      <NavShell activeHref="/" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={activeOrganizationId}>
         <OrganiserDashboard filmName={film.name} upcoming={upcoming} />
         <AutoRefresh />
         {tour === "1" && <DashboardTour />}
@@ -87,7 +87,7 @@ export default async function Home({
   const { upcoming } = await getMyShootsData(membership.id, film.id, film.showTentativeToCrew);
 
   return (
-    <NavShell activeHref="/">
+    <NavShell activeHref="/" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={activeOrganizationId}>
       <CrewToday filmName={film.name} upcoming={upcoming.slice(0, 5)} />
     </NavShell>
   );

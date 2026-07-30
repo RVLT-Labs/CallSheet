@@ -6,7 +6,7 @@ import { MyShoots } from "@/components/shoots/my-shoots";
 import { ShootSlotSwap } from "@/components/shoots/shoot-slot-swap";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { NavShell } from "@/components/ui/nav";
+import { NavShell } from "@/components/ui/nav-shell";
 import { PageShell } from "@/components/ui/page-shell";
 import { StatusDot } from "@/components/ui/status-dot";
 import { auth } from "@/lib/auth";
@@ -35,7 +35,7 @@ export default async function ShootsPage() {
   if (!isOrganiser) {
     const { pending, upcoming, past } = await getMyShootsData(membership.id, organizationId, film.showTentativeToCrew);
     return (
-      <NavShell activeHref="/shoots">
+      <NavShell activeHref="/shoots" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={organizationId}>
         <MyShoots pending={pending} upcoming={upcoming} past={past} />
       </NavShell>
     );
@@ -44,7 +44,7 @@ export default async function ShootsPage() {
   const [shoots, crew] = await Promise.all([getFilmShoots(organizationId), getFilmCrew(organizationId)]);
 
   return (
-    <NavShell activeHref="/shoots">
+    <NavShell activeHref="/shoots" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={organizationId}>
       <PageShell maxWidth="max-w-7xl">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="font-display text-2xl font-bold italic text-burgundy md:text-3xl">Shoots</h1>

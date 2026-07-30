@@ -1,8 +1,10 @@
+import type { ComponentType, SVGProps } from "react";
 import Link from "next/link";
-import type { ComponentType, ReactNode, SVGProps } from "react";
 
 import { cn } from "@/lib/cn";
+import { ProfileMenu } from "@/components/nav/profile-menu";
 import { CalendarIcon, ClapperboardIcon, HomeIcon } from "@/components/ui/icons";
+import type { Membership } from "@/server/memberships";
 
 export type NavItem = {
   label: string;
@@ -11,6 +13,13 @@ export type NavItem = {
   /** Anchor id for the dashboard product tour (product-tour.tsx) — omitted where a step doesn't target this item. */
   tourId?: string;
 };
+
+export type NavUser = {
+  id: string;
+  name: string;
+};
+
+export type MembershipGroups = { active: Membership[]; wrapped: Membership[] };
 
 // Comms (bulk messaging, issue #15) isn't built yet — left out of the nav
 // until the route exists rather than linking somewhere that 404s.
@@ -23,13 +32,22 @@ export const DEFAULT_NAV_ITEMS: NavItem[] = [
 type NavProps = {
   items?: NavItem[];
   activeHref: string;
+  user?: NavUser;
+  activeOrganizationId?: string | null;
+  memberships?: MembershipGroups;
 };
 
 /**
  * Mobile bottom tab bar (design system §5.6) — 4 items, custom thin-stroke
  * icons, never emoji. Inactive = ink-soft stroke, active = burgundy stroke.
  */
-export function BottomTabBar({ items = DEFAULT_NAV_ITEMS, activeHref }: NavProps) {
+export function BottomTabBar({
+  items = DEFAULT_NAV_ITEMS,
+  activeHref,
+  user,
+  activeOrganizationId = null,
+  memberships = { active: [], wrapped: [] },
+}: NavProps) {
   return (
     <nav className="flex justify-around border-t border-hairline bg-cream pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 md:hidden">
       {items.map((item) => {
@@ -52,6 +70,15 @@ export function BottomTabBar({ items = DEFAULT_NAV_ITEMS, activeHref }: NavProps
           </Link>
         );
       })}
+      {user && (
+        <ProfileMenu
+          variant="mobile"
+          name={user.name}
+          activeHref={activeHref}
+          activeOrganizationId={activeOrganizationId}
+          memberships={memberships}
+        />
+      )}
     </nav>
   );
 }
@@ -61,13 +88,19 @@ export function BottomTabBar({ items = DEFAULT_NAV_ITEMS, activeHref }: NavProps
  * underline on the active item. No sidebar — deliberate correction from an
  * earlier sidebar pass that felt too "generic SaaS dashboard."
  */
-export function TopNav({ items = DEFAULT_NAV_ITEMS, activeHref }: NavProps) {
+export function TopNav({
+  items = DEFAULT_NAV_ITEMS,
+  activeHref,
+  user,
+  activeOrganizationId = null,
+  memberships = { active: [], wrapped: [] },
+}: NavProps) {
   return (
     <nav className="hidden items-center justify-between border-b border-hairline px-8 py-4 md:flex">
       <Link href="/" className="font-display text-xl font-bold italic text-burgundy">
         Callsheet
       </Link>
-      <div className="flex gap-8">
+      <div className="flex items-center gap-8">
         {items.map((item) => {
           const active = item.href === activeHref;
           return (
@@ -85,26 +118,16 @@ export function TopNav({ items = DEFAULT_NAV_ITEMS, activeHref }: NavProps) {
             </Link>
           );
         })}
+        {user && (
+          <ProfileMenu
+            variant="desktop"
+            name={user.name}
+            activeHref={activeHref}
+            activeOrganizationId={activeOrganizationId}
+            memberships={memberships}
+          />
+        )}
       </div>
     </nav>
-  );
-}
-
-/**
- * The standard authenticated-page frame (issue #11) — desktop TopNav above
- * the content, mobile BottomTabBar below it, same `activeHref` driving both.
- * Every top-level authenticated route composes this rather than one-off
- * rendering TopNav/BottomTabBar itself.
- */
-export function NavShell({ activeHref, children }: { activeHref: string; children: ReactNode }) {
-  return (
-    <>
-      <TopNav activeHref={activeHref} />
-      {/* cream-deep canvas on desktop only — gives page content (a PageShell
-          sheet, or CenteredCard) a background to sit on top of, so it doesn't
-          just blend into the page (mobile stays edge-to-edge, no canvas). */}
-      <div className="flex flex-1 flex-col md:bg-cream-deep">{children}</div>
-      <BottomTabBar activeHref={activeHref} />
-    </>
   );
 }
