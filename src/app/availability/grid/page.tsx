@@ -1,6 +1,7 @@
 import { AvailabilityGrid } from "@/components/availability/availability-grid";
 import { TopNav } from "@/components/ui/nav";
-import { getAggregateAvailability, requireActiveOrganiserFilm } from "@/server/availability-grid";
+import { getAggregateAvailability } from "@/server/availability-grid";
+import { requireActiveOrganiserFilm } from "@/server/organiser";
 
 export default async function AvailabilityGridPage({
   searchParams,
