@@ -1,5 +1,6 @@
 "use client";
 
+import { CrewList } from "@/components/settings/crew-list";
 import { OrganiserList } from "@/components/settings/organiser-list";
 import { PrivacyToggleField } from "@/components/settings/privacy-toggle-field";
 import { WrapStatusBox } from "@/components/settings/wrap-status-box";
@@ -9,6 +10,7 @@ import { TextField } from "@/components/ui/text-field";
 import { saveFilmSettings } from "@/app/settings/actions";
 
 type Organiser = { id: string; user: { id: string; name: string } };
+type CrewMember = { id: string; roleTags: string[]; user: { id: string; name: string } };
 
 type FilmSettingsFormProps = {
   film: {
@@ -22,6 +24,7 @@ type FilmSettingsFormProps = {
     showAvailabilityToCrew: boolean;
   };
   organisers: Organiser[];
+  crew: CrewMember[];
   currentUserId: string;
 };
 
@@ -34,7 +37,7 @@ function toDateInputValue(date: Date | null) {
  * "Reactivate" escape hatch, and every setting below becomes visibly
  * disabled (45% opacity, no interaction) rather than hidden.
  */
-export function FilmSettingsForm({ film, organisers, currentUserId }: FilmSettingsFormProps) {
+export function FilmSettingsForm({ film, organisers, crew, currentUserId }: FilmSettingsFormProps) {
   const isWrapped = film.status === "wrapped";
 
   return (
@@ -98,6 +101,11 @@ export function FilmSettingsForm({ film, organisers, currentUserId }: FilmSettin
           </SubmitButton>
         )}
       </form>
+
+      <div className={isWrapped ? "pointer-events-none mt-6 opacity-45" : "mt-6"}>
+        <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Crew</p>
+        <CrewList crew={crew} />
+      </div>
 
       <div className={isWrapped ? "pointer-events-none mt-6 opacity-45" : "mt-6"}>
         <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Organisers</p>

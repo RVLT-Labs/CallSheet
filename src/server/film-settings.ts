@@ -16,9 +16,16 @@ export async function getFilmSettingsContext(organizationId: string, userId: str
     orderBy: { createdAt: "asc" },
   });
 
+  const crew = await prisma.member.findMany({
+    where: { organizationId, role: "member" },
+    select: { id: true, roleTags: true, user: { select: { id: true, name: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+
   return {
     film,
     isOrganiser: membership?.role !== "member" && !!membership,
     organisers,
+    crew,
   };
 }
