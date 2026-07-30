@@ -168,6 +168,12 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
         </button>
       </div>
 
+      {days.length === 0 && rules.length === 0 && (
+        <p className="mb-3 text-[12.5px] text-ink-soft">
+          Nothing set yet. Tap a day below to mark yourself Best, OK, or Unavailable.
+        </p>
+      )}
+
       <div className="grid grid-cols-7 gap-1 text-center">
         {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
           <span key={i} className="text-[10px] font-bold uppercase text-ink-faint">
@@ -256,7 +262,7 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
               <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Morning</p>
               {selectedRuleAm && (
                 <p className="mb-1.5 text-[11px] italic text-ink-faint">
-                  Set by your recurring rule &quot;{selectedRuleAm.ruleLabel ?? "Untitled rule"}&quot; — tap to
+                  Set by your recurring rule &quot;{selectedRuleAm.ruleLabel ?? "Untitled rule"}&quot;. Tap to
                   override just this day.
                 </p>
               )}
@@ -271,7 +277,7 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
               <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Afternoon</p>
               {selectedRulePm && (
                 <p className="mb-1.5 text-[11px] italic text-ink-faint">
-                  Set by your recurring rule &quot;{selectedRulePm.ruleLabel ?? "Untitled rule"}&quot; — tap to
+                  Set by your recurring rule &quot;{selectedRulePm.ruleLabel ?? "Untitled rule"}&quot;. Tap to
                   override just this day.
                 </p>
               )}

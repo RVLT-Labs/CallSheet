@@ -50,7 +50,13 @@ export default async function ShootsPage() {
         </div>
 
         {shoots.length === 0 && (
-          <p className="text-[13px] text-ink-soft">No shoots yet. Plan one once your crew has entered their availability.</p>
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
+            <p className="font-display text-xl font-bold italic text-burgundy">Nothing on the schedule yet</p>
+            <p className="max-w-sm text-sm text-ink-soft">
+              Once your crew has some availability in, Plan a shoot will find dates that actually work for
+              everyone.
+            </p>
+          </div>
         )}
 
         {shoots.map((shoot) => {

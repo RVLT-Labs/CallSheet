@@ -26,7 +26,7 @@ export function WrapStatusBox() {
     <div className="mt-1.5 rounded-xl border border-hairline bg-white p-4">
       <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-forest">● Active</p>
       <p className="mb-3 text-xs leading-relaxed text-ink-soft">
-        Wrapping stops availability reminders and RSVP nudges. Nothing is deleted — the film stays visible and
+        Wrapping stops availability reminders and RSVP nudges. Nothing is deleted. The film stays visible and
         read-only.
       </p>
       <form action={wrapFilm}>

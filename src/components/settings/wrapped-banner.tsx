@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useFormStatus } from "react-dom";
 
 import { reactivateFilm } from "@/app/settings/actions";
@@ -24,6 +25,9 @@ export function WrappedBanner() {
       <p className="text-[11.5px] leading-relaxed text-ink-soft">
         Reminders and nudges are off. Everything below is read-only.
       </p>
+      <Link href="/wrapped" className="mt-2 block text-[11.5px] font-bold text-burgundy">
+        View wrap summary
+      </Link>
       <form action={reactivateFilm}>
         <ReactivateSubmit />
       </form>
