@@ -5,7 +5,9 @@ import { redirect } from "next/navigation";
 import { MyShoots } from "@/components/shoots/my-shoots";
 import { ShootSlotSwap } from "@/components/shoots/shoot-slot-swap";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { NavShell } from "@/components/ui/nav";
+import { PageShell } from "@/components/ui/page-shell";
 import { StatusDot } from "@/components/ui/status-dot";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -43,9 +45,9 @@ export default async function ShootsPage() {
 
   return (
     <NavShell activeHref="/shoots">
-      <div className="mx-auto w-full max-w-3xl px-4 py-8 md:px-8">
+      <PageShell maxWidth="max-w-7xl">
         <div className="mb-6 flex items-center justify-between">
-          <h1 className="font-display text-2xl font-bold italic text-burgundy">Shoots</h1>
+          <h1 className="font-display text-2xl font-bold italic text-burgundy md:text-3xl">Shoots</h1>
           <Button href="/shoots/new">Plan a shoot</Button>
         </div>
 
@@ -59,41 +61,45 @@ export default async function ShootsPage() {
           </div>
         )}
 
-        {shoots.map((shoot) => {
-          const dates = [...new Set(shoot.days.map((d) => d.date.toISOString().slice(0, 10)))];
-          const activeSlots = shoot.slots.filter((s) => !s.removedAt);
-          const requiredSlots = activeSlots.filter((s) => s.kind === "required");
-          const generalSlots = activeSlots.filter((s) => s.kind === "general");
+        <div className="md:grid md:grid-cols-2 md:gap-4 lg:grid-cols-3">
+          {shoots.map((shoot) => {
+            const dates = [...new Set(shoot.days.map((d) => d.date.toISOString().slice(0, 10)))];
+            const activeSlots = shoot.slots.filter((s) => !s.removedAt);
+            const requiredSlots = activeSlots.filter((s) => s.kind === "required");
+            const generalSlots = activeSlots.filter((s) => s.kind === "general");
 
-          return (
-            <div key={shoot.id} className="border-b border-hairline py-4">
-              <Link href={`/shoots/${shoot.id}`} className="mb-1.5 flex items-center justify-between">
-                <p className="text-[14px] font-semibold">
-                  {shoot.title ?? (dates.length === 1 ? dates[0] : `${dates[0]} – ${dates[dates.length - 1]}`)}
-                </p>
-                <StatusDot
-                  tone={shoot.status === "confirmed" ? "forest" : "terracotta"}
-                  label={shoot.status === "confirmed" ? "Confirmed" : "Tentative"}
-                />
-              </Link>
-              <p className="mb-2 text-[12px] text-ink-soft">
-                {requiredSlots.length} required · {generalSlots.length} general
-              </p>
+            return (
+              <div key={shoot.id} className="mb-4 last:mb-0 md:mb-0">
+                <Card>
+                  <Link href={`/shoots/${shoot.id}`} className="mb-1.5 flex items-center justify-between">
+                    <p className="text-[14px] font-semibold">
+                      {shoot.title ?? (dates.length === 1 ? dates[0] : `${dates[0]} – ${dates[dates.length - 1]}`)}
+                    </p>
+                    <StatusDot
+                      tone={shoot.status === "confirmed" ? "forest" : "terracotta"}
+                      label={shoot.status === "confirmed" ? "Confirmed" : "Tentative"}
+                    />
+                  </Link>
+                  <p className="mb-2 text-[12px] text-ink-soft">
+                    {requiredSlots.length} required · {generalSlots.length} general
+                  </p>
 
-              {[...requiredSlots, ...generalSlots]
-                .filter((slot) => !slot.membershipId)
-                .map((slot) => (
-                  <ShootSlotSwap
-                    key={slot.id}
-                    slotId={slot.id}
-                    label={slot.placeholderLabel ?? ""}
-                    crew={crew.map((c) => ({ membershipId: c.id, name: c.user.name }))}
-                  />
-                ))}
-            </div>
-          );
-        })}
-      </div>
+                  {[...requiredSlots, ...generalSlots]
+                    .filter((slot) => !slot.membershipId)
+                    .map((slot) => (
+                      <ShootSlotSwap
+                        key={slot.id}
+                        slotId={slot.id}
+                        label={slot.placeholderLabel ?? ""}
+                        crew={crew.map((c) => ({ membershipId: c.id, name: c.user.name }))}
+                      />
+                    ))}
+                </Card>
+              </div>
+            );
+          })}
+        </div>
+      </PageShell>
     </NavShell>
   );
 }

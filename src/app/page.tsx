@@ -10,7 +10,7 @@ import { LandingPage } from "@/components/marketing/landing-page";
 import { NavShell } from "@/components/ui/nav";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getAvailabilityHeatmapSummary, getOrganiserUpcomingShoots } from "@/server/dashboard";
+import { getOrganiserUpcomingShoots } from "@/server/dashboard";
 import { getMembershipsForUser } from "@/server/memberships";
 import { getMyShootsData } from "@/server/my-shoots";
 
@@ -53,16 +53,11 @@ export default async function Home() {
   const isOrganiser = activeFilm.role !== "member";
 
   if (isOrganiser) {
-    const [upcoming, heatmapDays] = await Promise.all([
-      getOrganiserUpcomingShoots(film.id),
-      film.dateRangeStart && film.dateRangeEnd
-        ? getAvailabilityHeatmapSummary(film.id, film.dateRangeStart, film.dateRangeEnd)
-        : Promise.resolve([]),
-    ]);
+    const upcoming = await getOrganiserUpcomingShoots(film.id);
 
     return (
       <NavShell activeHref="/">
-        <OrganiserDashboard filmName={film.name} upcoming={upcoming} heatmapDays={heatmapDays} />
+        <OrganiserDashboard filmName={film.name} upcoming={upcoming} />
         <AutoRefresh />
       </NavShell>
     );

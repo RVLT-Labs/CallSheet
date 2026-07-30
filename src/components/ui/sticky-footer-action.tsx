@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
  */
 export function StickyFooterAction({ children }: { children: ReactNode }) {
   return (
-    <div className="sticky bottom-0 border-t border-hairline bg-white p-4">
+    <div className="sticky bottom-0 border-t border-hairline bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
       {children}
     </div>
   );
