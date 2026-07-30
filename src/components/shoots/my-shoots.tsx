@@ -11,7 +11,7 @@ import { PageShell } from "@/components/ui/page-shell";
 import { Sheet } from "@/components/ui/sheet";
 import { StatusDot } from "@/components/ui/status-dot";
 import { StickyFooterAction } from "@/components/ui/sticky-footer-action";
-import { needsStickyAcceptAllFooter, splitSoonestPending } from "@/lib/my-shoots-rules";
+import { NOTHING_SCHEDULED_COPY, needsStickyAcceptAllFooter, splitSoonestPending } from "@/lib/my-shoots-rules";
 import type { MyShoot } from "@/server/my-shoots";
 
 const INVITE_TONE = { accepted: "forest", declined: "burgundy", pending: "taupe" } as const;
@@ -124,7 +124,7 @@ export function MyShoots({ pending, upcoming, past }: { pending: MyShoot[]; upco
 
       <div className="mt-8">
         <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Upcoming</p>
-        {upcoming.length === 0 && <p className="text-[13px] text-ink-soft">Nothing scheduled yet.</p>}
+        {upcoming.length === 0 && <p className="text-[13px] text-ink-soft">{NOTHING_SCHEDULED_COPY}</p>}
         <div className="md:grid md:grid-cols-2 md:gap-x-10">
           {upcoming.map((shoot) => (
             <Link

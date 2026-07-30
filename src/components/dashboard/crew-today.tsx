@@ -3,6 +3,7 @@ import Link from "next/link";
 import { DayStrip } from "@/components/dashboard/day-strip";
 import { PageShell } from "@/components/ui/page-shell";
 import { StatusDot } from "@/components/ui/status-dot";
+import { NOTHING_SCHEDULED_COPY } from "@/lib/my-shoots-rules";
 import type { MyShoot } from "@/server/my-shoots";
 
 const INVITE_TONE = { accepted: "forest", declined: "burgundy", pending: "taupe" } as const;
@@ -29,7 +30,7 @@ export function CrewToday({ filmName, upcoming }: { filmName: string; upcoming: 
 
           <div className="mt-8">
             <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Upcoming</p>
-            {upcoming.length === 0 && <p className="text-[13px] text-ink-soft">Nothing scheduled yet.</p>}
+            {upcoming.length === 0 && <p className="text-[13px] text-ink-soft">{NOTHING_SCHEDULED_COPY}</p>}
             {upcoming.map((shoot) => (
               <Link
                 key={shoot.id}

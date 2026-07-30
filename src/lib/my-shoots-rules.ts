@@ -23,3 +23,11 @@ export function needsStickyAcceptAllFooter(totalPendingCount: number) {
 export function isShootVisibleToCrew(status: "tentative" | "confirmed", showTentativeToCrew: boolean) {
   return status === "confirmed" || showTentativeToCrew;
 }
+
+/**
+ * Crew's "nothing scheduled" empty state gets a light line of personality
+ * and deliberately no CTA (issue #12 acceptance criteria) — there's nothing
+ * for them to do, the organiser hasn't locked anything in yet. Shared
+ * between Today and My Shoots so the two surfaces never drift out of voice.
+ */
+export const NOTHING_SCHEDULED_COPY = "Nothing on the call sheet yet. Check back once something's locked in.";
