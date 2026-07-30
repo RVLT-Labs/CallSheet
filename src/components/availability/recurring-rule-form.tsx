@@ -54,7 +54,7 @@ export function RecurringRuleForm({
 
   const selectedDayNames = days.map((v, i) => (v ? DAY_NAMES[i] : null)).filter(Boolean) as string[];
   const halfDayLabel = halfDay === "AM" ? "morning" : halfDay === "PM" ? "afternoon" : "all day";
-  const summary = `Repeats every week on ${selectedDayNames.join(", ") || "—"}, ${halfDayLabel} — ${TIER_LABEL[tier]}. Ends ${
+  const summary = `Repeats every week on ${selectedDayNames.join(", ") || "no days yet"}, ${halfDayLabel} · ${TIER_LABEL[tier]}. Ends ${
     endsMode === "never" ? "never" : `on ${effectiveEnd}`
   }.`;
 

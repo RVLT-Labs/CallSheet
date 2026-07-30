@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -50,6 +51,7 @@ export async function wrapFilm() {
   const { organizationId } = await requireActiveOrganiser();
   await prisma.organization.update({ where: { id: organizationId }, data: { status: "wrapped" } });
   revalidatePath("/settings");
+  redirect("/wrapped");
 }
 
 export async function reactivateFilm() {

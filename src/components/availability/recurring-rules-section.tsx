@@ -20,7 +20,7 @@ export type RuleRow = {
 function summarize(rule: RuleRow) {
   const dayName = DAY_NAMES[rule.dayOfWeek];
   const halfDayLabel = rule.halfDay === "AM" ? "morning" : rule.halfDay === "PM" ? "afternoon" : "all day";
-  return `Every ${dayName}, ${halfDayLabel} — ${TIER_LABEL[rule.tier as Tier]}`;
+  return `Every ${dayName}, ${halfDayLabel} · ${TIER_LABEL[rule.tier as Tier]}`;
 }
 
 /**
