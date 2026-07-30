@@ -62,7 +62,7 @@ export const auth = betterAuth({
         // fallback here would silently break invitation links in any deploy that
         // doesn't set it, same failure mode as the sign-in CORS bug. Fail loudly
         // instead of emailing a broken link if it's genuinely unconfigured.
-        const baseURL = getBaseURL();
+        const baseURL = getBaseURL(undefined, "/");
         if (!baseURL) {
           throw new Error(
             "BETTER_AUTH_URL is not set — cannot build an invitation link.",
