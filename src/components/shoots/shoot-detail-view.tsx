@@ -9,6 +9,7 @@ import { RequiredMarker, StatusDot } from "@/components/ui/status-dot";
 import { Sheet } from "@/components/ui/sheet";
 import { TextField } from "@/components/ui/text-field";
 import { TextAreaField } from "@/components/ui/textarea-field";
+import { HALF_DAY_LABEL } from "@/lib/half-day";
 import { countRsvpStatuses, type InviteStatus } from "@/server/shoot-roster";
 
 import {
@@ -216,11 +217,20 @@ function EditDetailsForm({ shoot, onSaved }: { shoot: ShootDetailData; onSaved: 
   const [locationAddress, setLocationAddress] = useState(shoot.locationAddress ?? "");
   const [locationMapUrl, setLocationMapUrl] = useState(shoot.locationMapUrl ?? "");
   const [locationNotes, setLocationNotes] = useState(shoot.locationNotes ?? "");
+  const [callTimes, setCallTimes] = useState<Record<string, string>>(
+    Object.fromEntries(shoot.days.map((d) => [d.id, d.defaultCallTime])),
+  );
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
     setSaving(true);
-    await updateShootDetailsAction(shoot.id, { title, locationAddress, locationMapUrl, locationNotes });
+    await updateShootDetailsAction(shoot.id, {
+      title,
+      locationAddress,
+      locationMapUrl,
+      locationNotes,
+      dayCallTimes: shoot.days.map((d) => ({ dayId: d.id, defaultCallTime: callTimes[d.id] ?? d.defaultCallTime })),
+    });
     setSaving(false);
     onSaved();
   }
@@ -236,6 +246,31 @@ function EditDetailsForm({ shoot, onSaved }: { shoot: ShootDetailData; onSaved: 
         onChange={(e) => setLocationNotes(e.target.value)}
         placeholder="Parking, nearest hospital, load-in instructions…"
       />
+
+      {shoot.days.length > 0 && (
+        <div className="mb-[18px]">
+          <p className="mb-1.5 block text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Default call time</p>
+          {shoot.days.map((day) => (
+            <div key={day.id} className="mb-2 flex items-center justify-between gap-3">
+              <span className="text-[12.5px] text-ink-soft">
+                {day.dateIso} · {HALF_DAY_LABEL[day.halfDay]}
+              </span>
+              <input
+                type="time"
+                value={callTimes[day.id] ?? day.defaultCallTime}
+                onChange={(e) => setCallTimes((prev) => ({ ...prev, [day.id]: e.target.value }))}
+                className="rounded-md border border-hairline bg-white px-2 py-1 text-[12.5px]"
+              />
+            </div>
+          ))}
+          {shoot.status === "confirmed" && (
+            <p className="text-[11px] italic text-ink-faint">
+              Changing the call time or location here emails everyone still invited, with an updated calendar invite.
+            </p>
+          )}
+        </div>
+      )}
+
       <Button variant="primary" disabled={saving} onClick={handleSave} className="w-full">
         {saving ? "Saving…" : "Save"}
       </Button>

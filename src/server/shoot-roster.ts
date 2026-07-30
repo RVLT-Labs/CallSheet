@@ -31,3 +31,32 @@ export function countRsvpStatuses(invites: { status: InviteStatus }[]): RsvpCoun
   for (const invite of invites) counts[invite.status]++;
   return counts;
 }
+
+/**
+ * A Tentative shoot has no invites to notify (issue #9), so an edit is silent
+ * either way. A Confirmed shoot's time/location change must never be a silent
+ * dashboard-only update (issue #10 acceptance criteria) — this is the gate
+ * that decides whether an edit fires notification emails.
+ */
+export function shouldNotifyShootChange(status: "tentative" | "confirmed", changedFieldCount: number) {
+  return status === "confirmed" && changedFieldCount > 0;
+}
+
+export const REMINDER_THRESHOLD_DAYS = 3;
+
+/**
+ * A Pending invite gets exactly one automatic reminder once it's been
+ * sitting long enough (issue #10 acceptance criteria) — the
+ * lastReminderSentAt guard is what makes it "exactly one," never repeated.
+ */
+export function isInviteDueForReminder(
+  invite: { status: InviteStatus; sentAt: Date | null; lastReminderSentAt: Date | null },
+  now: Date,
+) {
+  if (invite.status !== "pending") return false;
+  if (!invite.sentAt) return false;
+  if (invite.lastReminderSentAt) return false;
+
+  const dueAt = invite.sentAt.getTime() + REMINDER_THRESHOLD_DAYS * 24 * 60 * 60 * 1000;
+  return now.getTime() >= dueAt;
+}

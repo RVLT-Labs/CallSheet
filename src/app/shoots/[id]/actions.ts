@@ -19,7 +19,14 @@ export async function confirmShootAction(shootId: string) {
 
 export async function updateShootDetailsAction(
   shootId: string,
-  data: { title?: string; locationAddress?: string; locationMapUrl?: string; locationNotes?: string; notes?: string },
+  data: {
+    title?: string;
+    locationAddress?: string;
+    locationMapUrl?: string;
+    locationNotes?: string;
+    notes?: string;
+    dayCallTimes?: { dayId: string; defaultCallTime: string }[];
+  },
 ) {
   const { organizationId } = await requireActiveOrganiserFilm();
   await updateShootDetails(shootId, organizationId, data);

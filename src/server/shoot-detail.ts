@@ -1,11 +1,13 @@
 import { randomBytes } from "crypto";
 
 import { prisma } from "@/lib/prisma";
-import { sendPlainEmail } from "@/lib/email";
 import type { Tier } from "@/lib/availability-tiers";
+import { HALF_DAY_LABEL } from "@/lib/half-day";
 import { getAvailabilityCalendarData } from "@/server/availability";
 import { toIsoDate } from "@/server/availability-rules";
-import { canNudgeInvite, removalOutcomeForInvite } from "@/server/shoot-roster";
+import { removalOutcomeForInvite, shouldNotifyShootChange } from "@/server/shoot-roster";
+import { notifyConfirmedShootChange, sendInviteEmail, sendReminderEmail } from "@/server/shoot-invite-email";
+import type { ChangeField } from "@/lib/email-templates";
 
 export async function getShootDetail(shootId: string, organizationId: string) {
   const shoot = await prisma.shoot.findFirst({
@@ -34,9 +36,9 @@ function generateInviteToken() {
 /**
  * Creates one pending ShootInvite per real (non-placeholder) crew member
  * across the shoot's required + general slots — this is what "confirming a
- * shoot" means (issue #9 scope). Actual email dispatch/tokens for no-login
- * accept-decline links and the .ics attachment are issue #10's scope; this
- * just establishes the invite record the roster/RSVP UI reads from.
+ * shoot" means (issue #9 scope) — then sends each one its invite email with
+ * a per-person .ics attachment and no-login accept/decline links (issue #10
+ * scope).
  */
 export async function ensureInvitesForShoot(shootId: string) {
   const slots = await prisma.shootSlot.findMany({
@@ -53,13 +55,13 @@ export async function ensureInvitesForShoot(shootId: string) {
   const toCreate = membershipIds.filter((id) => !existingIds.has(id));
   if (toCreate.length === 0) return;
 
-  await prisma.shootInvite.createMany({
-    data: toCreate.map((membershipId) => ({
-      shootId,
-      membershipId,
-      token: generateInviteToken(),
-    })),
-  });
+  const created = await Promise.all(
+    toCreate.map((membershipId) =>
+      prisma.shootInvite.create({ data: { shootId, membershipId, token: generateInviteToken() } }),
+    ),
+  );
+
+  await Promise.all(created.map((invite) => sendInviteEmail(invite.id)));
 }
 
 /** Tentative -> Confirmed is an explicit action distinct from creation (issue #9 acceptance criteria). */
@@ -72,42 +74,76 @@ export async function confirmShoot(shootId: string, organizationId: string) {
   return updated;
 }
 
-export async function updateShootDetails(
-  shootId: string,
-  organizationId: string,
-  data: { title?: string; locationAddress?: string; locationMapUrl?: string; locationNotes?: string; notes?: string },
-) {
-  await prisma.shoot.updateMany({
+export type UpdateShootDetailsInput = {
+  title?: string;
+  locationAddress?: string;
+  locationMapUrl?: string;
+  locationNotes?: string;
+  notes?: string;
+  dayCallTimes?: { dayId: string; defaultCallTime: string }[];
+};
+
+/**
+ * Editing a Confirmed shoot's time or location must never be a silent
+ * dashboard-only change (issue #10 acceptance criteria) — this diffs the
+ * two fields that actually matter to someone already invited (location,
+ * per-day call time; not title/map-link/notes, which are convenience
+ * metadata) and fires a change-notification email + fresh .ics when either
+ * one moves on an already-Confirmed shoot. A Tentative shoot has no invites
+ * to notify either way.
+ */
+export async function updateShootDetails(shootId: string, organizationId: string, data: UpdateShootDetailsInput) {
+  const before = await prisma.shoot.findFirst({
     where: { id: shootId, filmId: organizationId },
+    include: { days: true },
+  });
+  if (!before) return;
+
+  const changes: ChangeField[] = [];
+
+  const nextLocationAddress = data.locationAddress !== undefined ? data.locationAddress.trim() || null : undefined;
+  if (nextLocationAddress !== undefined && nextLocationAddress !== before.locationAddress) {
+    changes.push({
+      label: "Location",
+      oldValue: before.locationAddress ?? "Not set",
+      newValue: nextLocationAddress ?? "Not set",
+    });
+  }
+
+  await prisma.shoot.update({
+    where: { id: shootId },
     data: {
       title: data.title !== undefined ? (data.title.trim() || null) : undefined,
-      locationAddress: data.locationAddress !== undefined ? (data.locationAddress.trim() || null) : undefined,
+      locationAddress: nextLocationAddress,
       locationMapUrl: data.locationMapUrl !== undefined ? (data.locationMapUrl.trim() || null) : undefined,
       locationNotes: data.locationNotes !== undefined ? (data.locationNotes.trim() || null) : undefined,
       notes: data.notes !== undefined ? (data.notes.trim() || null) : undefined,
     },
   });
+
+  if (data.dayCallTimes) {
+    const dayById = new Map(before.days.map((d) => [d.id, d]));
+    for (const { dayId, defaultCallTime } of data.dayCallTimes) {
+      const day = dayById.get(dayId);
+      if (!day || day.defaultCallTime === defaultCallTime) continue;
+
+      changes.push({
+        label: `${toIsoDate(day.date)} ${HALF_DAY_LABEL[day.halfDay]} call time`,
+        oldValue: day.defaultCallTime,
+        newValue: defaultCallTime,
+      });
+      await prisma.shootDay.update({ where: { id: dayId }, data: { defaultCallTime } });
+    }
+  }
+
+  if (shouldNotifyShootChange(before.status, changes.length)) {
+    await notifyConfirmedShootChange(shootId, changes);
+  }
 }
 
 /** Resends a reminder only to that one pending person (issue #9 acceptance criteria). */
 export async function nudgeInvite(inviteId: string) {
-  const invite = await prisma.shootInvite.findUniqueOrThrow({
-    where: { id: inviteId },
-    include: {
-      membership: { include: { user: { select: { name: true, email: true } } } },
-      shoot: true,
-    },
-  });
-  if (!canNudgeInvite(invite.status)) return;
-
-  await prisma.shootInvite.update({ where: { id: inviteId }, data: { lastReminderSentAt: new Date() } });
-
-  const shootLabel = invite.shoot.title ?? "your shoot";
-  await sendPlainEmail({
-    to: invite.membership.user.email,
-    subject: `Reminder: RSVP for ${shootLabel}`,
-    html: `<p>Hi ${invite.membership.user.name},</p><p>Just a reminder to respond to your invite for ${shootLabel}. Sign in to Callsheet to accept or decline.</p>`,
-  });
+  await sendReminderEmail(inviteId);
 }
 
 /**
