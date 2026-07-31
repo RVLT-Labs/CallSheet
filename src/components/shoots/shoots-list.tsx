@@ -37,7 +37,7 @@ export function ShootsList({
   shoots: ShootListItem[];
   crew: { membershipId: string; name: string }[];
 }) {
-  const [view, setView] = useState<"cards" | "table">("cards");
+  const [view, setView] = useState<"cards" | "table">("table");
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {

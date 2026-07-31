@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes } from "react";
+import { forwardRef, type InputHTMLAttributes } from "react";
 
 type TextFieldProps = InputHTMLAttributes<HTMLInputElement> & {
   label: string;
@@ -10,7 +10,10 @@ type TextFieldProps = InputHTMLAttributes<HTMLInputElement> & {
  * system field pattern — small uppercase label, hairline underline that
  * turns burgundy on focus, no boxed border).
  */
-export function TextField({ label, hint, id, ...props }: TextFieldProps) {
+export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function TextField(
+  { label, hint, id, ...props },
+  ref,
+) {
   const inputId = id ?? label.toLowerCase().replace(/\s+/g, "-");
   return (
     <div className="mb-[18px]">
@@ -21,6 +24,7 @@ export function TextField({ label, hint, id, ...props }: TextFieldProps) {
         {label}
       </label>
       <input
+        ref={ref}
         id={inputId}
         className="w-full border-0 border-b-[1.5px] border-hairline bg-transparent py-2 text-[14.5px] text-ink placeholder:text-ink-faint focus:border-burgundy focus:outline-none"
         {...props}
@@ -28,4 +32,4 @@ export function TextField({ label, hint, id, ...props }: TextFieldProps) {
       {hint && <p className="mt-1.5 text-[11px] italic text-ink-faint">{hint}</p>}
     </div>
   );
-}
+});
