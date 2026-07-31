@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { FilmPickerList } from "@/components/film-picker/film-picker-list";
+import { useFilmSwitch } from "@/components/film-picker/use-film-switch";
 import { Avatar } from "@/components/ui/avatar";
 import { Sheet } from "@/components/ui/sheet";
-import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/cn";
 import type { Membership } from "@/server/memberships";
 
@@ -28,13 +27,13 @@ type ProfileMenuProps = {
  */
 export function ProfileMenu({ name, activeHref, activeOrganizationId, memberships, variant }: ProfileMenuProps) {
   const [open, setOpen] = useState(false);
-  const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const profileActive = activeHref === "/profile";
   const currentMembership = [...memberships.active, ...memberships.wrapped].find(
     (m) => m.organization.id === activeOrganizationId,
   );
   const isOrganiser = currentMembership && currentMembership.role !== "member";
+  const { switchingId, switchTo } = useFilmSwitch(activeOrganizationId);
 
   useEffect(() => {
     if (!open || variant !== "desktop") return;
@@ -48,11 +47,8 @@ export function ProfileMenu({ name, activeHref, activeOrganizationId, membership
   }, [open, variant]);
 
   async function handleSelectFilm(organizationId: string) {
-    setOpen(false);
-    if (organizationId !== activeOrganizationId) {
-      await authClient.organization.setActive({ organizationId });
-    }
-    router.refresh();
+    const switching = await switchTo(organizationId);
+    if (!switching) setOpen(false);
   }
 
   const menuBody = (
@@ -62,6 +58,7 @@ export function ProfileMenu({ name, activeHref, activeOrganizationId, membership
         wrapped={memberships.wrapped}
         activeOrganizationId={activeOrganizationId}
         onSelect={handleSelectFilm}
+        switchingId={switchingId}
       />
       <div className="flex items-center gap-4 border-t border-hairline pt-3">
         <Link

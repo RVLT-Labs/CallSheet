@@ -1,11 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { FilmPickerList } from "@/components/film-picker/film-picker-list";
+import { useFilmSwitch } from "@/components/film-picker/use-film-switch";
 import { Sheet } from "@/components/ui/sheet";
-import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/cn";
 import type { Membership } from "@/server/memberships";
 
@@ -24,8 +23,8 @@ type FilmPickerProps = {
  */
 export function FilmPicker({ active, wrapped, activeOrganizationId, activeFilmName }: FilmPickerProps) {
   const [open, setOpen] = useState(false);
-  const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
+  const { switchingId, switchTo } = useFilmSwitch(activeOrganizationId);
 
   useEffect(() => {
     if (!open) return;
@@ -39,11 +38,11 @@ export function FilmPicker({ active, wrapped, activeOrganizationId, activeFilmNa
   }, [open]);
 
   async function handleSelect(organizationId: string) {
-    setOpen(false);
-    if (organizationId !== activeOrganizationId) {
-      await authClient.organization.setActive({ organizationId });
-    }
-    router.refresh();
+    const switching = await switchTo(organizationId);
+    // Same film reselected, or nothing to wait for — close right away.
+    // Otherwise leave the sheet open (film-picker-list.tsx shows the
+    // "Switching…" state) until the refreshed page replaces it.
+    if (!switching) setOpen(false);
   }
 
   return (
@@ -69,6 +68,7 @@ export function FilmPicker({ active, wrapped, activeOrganizationId, activeFilmNa
             wrapped={wrapped}
             activeOrganizationId={activeOrganizationId}
             onSelect={handleSelect}
+            switchingId={switchingId}
           />
         </Sheet>
       </div>
@@ -81,6 +81,7 @@ export function FilmPicker({ active, wrapped, activeOrganizationId, activeFilmNa
             wrapped={wrapped}
             activeOrganizationId={activeOrganizationId}
             onSelect={handleSelect}
+            switchingId={switchingId}
           />
         </div>
       )}

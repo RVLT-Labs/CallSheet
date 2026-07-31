@@ -19,6 +19,10 @@ type Props = {
  * Accepting the invite logs the person straight in (spec §4.1): once the
  * email-code verification authenticates them on this same page, this effect
  * finishes the job by accepting the invitation and dropping them at home.
+ * The code form's button stays in its "Verifying…" pending state the whole
+ * time (email-code-flow.tsx doesn't reset it on success) since this effect
+ * runs, and its redirect lands, while that same form instance is still on
+ * screen — so there's no gap where the page looks done but isn't.
  */
 export function AcceptInvitationClient({ invitationId, inviterName, filmName, role, email }: Props) {
   const { data: session } = useSession();
