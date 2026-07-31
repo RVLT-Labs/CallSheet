@@ -35,3 +35,40 @@ export async function getOrganiserUpcomingShoots(organizationId: string, limit =
 
   return upcoming.slice(0, limit);
 }
+
+export type OrganiserDashboardMeeting = {
+  id: string;
+  title: string | null;
+  status: "tentative" | "confirmed";
+  dateIsos: string[];
+  rsvp: { accepted: number; declined: number; pending: number } | null; // null for Tentative — no invites exist yet
+};
+
+/** Upcoming (today or later) meetings for the organiser dashboard glance, soonest first. */
+export async function getOrganiserUpcomingMeetings(
+  organizationId: string,
+  limit = 6,
+): Promise<OrganiserDashboardMeeting[]> {
+  const todayIso = toIsoDate(new Date());
+
+  const meetings = await prisma.meeting.findMany({
+    where: { filmId: organizationId },
+    include: { days: { orderBy: { date: "asc" } }, invites: { select: { status: true } } },
+  });
+
+  const upcoming = meetings
+    .map((meeting) => {
+      const dateIsos = [...new Set(meeting.days.map((d) => toIsoDate(d.date)))].sort();
+      return {
+        id: meeting.id,
+        title: meeting.title,
+        status: meeting.status,
+        dateIsos,
+        rsvp: meeting.status === "confirmed" ? countRsvpStatuses(meeting.invites) : null,
+      };
+    })
+    .filter((m) => m.dateIsos.length === 0 || m.dateIsos[m.dateIsos.length - 1] >= todayIso)
+    .sort((a, b) => (a.dateIsos[0] ?? "").localeCompare(b.dateIsos[0] ?? ""));
+
+  return upcoming.slice(0, limit);
+}
