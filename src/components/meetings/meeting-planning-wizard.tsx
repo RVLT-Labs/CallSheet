@@ -31,8 +31,8 @@ function StepDots({ step }: { step: Step }) {
 }
 
 const CREW_STATE_OPTIONS = [
-  { value: "off" as const, label: "Off", tone: "ink" as const },
-  { value: "general" as const, label: "In", tone: "forest" as const },
+  { value: "off" as const, label: "Not Required", tone: "ink" as const },
+  { value: "general" as const, label: "Optional", tone: "forest" as const },
   { value: "required" as const, label: "Required", tone: "burgundy" as const },
 ];
 
@@ -58,7 +58,6 @@ export function MeetingPlanningWizard({
     Object.fromEntries(crew.map((c) => [c.membershipId, "off" as CrewState])),
   );
   const [placeholders, setPlaceholders] = useState<Placeholder[]>([]);
-  const [newPlaceholderKind, setNewPlaceholderKind] = useState<"required" | "general">("required");
   const [newPlaceholderLabel, setNewPlaceholderLabel] = useState("");
 
   const [dayMode, setDayMode] = useState<"single" | "multi">("single");
@@ -88,7 +87,7 @@ export function MeetingPlanningWizard({
   function addPlaceholder() {
     const label = newPlaceholderLabel.trim();
     if (!label) return;
-    setPlaceholders((prev) => [...prev, { label, kind: newPlaceholderKind }]);
+    setPlaceholders((prev) => [...prev, { label, kind: "required" }]);
     setNewPlaceholderLabel("");
   }
 
@@ -148,14 +147,12 @@ export function MeetingPlanningWizard({
           Required people gate which dates can even be suggested. Everyone else is shown as a ratio only.
         </p>
 
-        {crew.length > 6 && (
-          <TextField
-            label="Search crew"
-            placeholder="Name…"
-            value={crewSearch}
-            onChange={(e) => setCrewSearch(e.target.value)}
-          />
-        )}
+        <TextField
+          label="Search crew"
+          placeholder="Name…"
+          value={crewSearch}
+          onChange={(e) => setCrewSearch(e.target.value)}
+        />
 
         {crew
           .filter((c) => c.name.toLowerCase().includes(crewSearch.trim().toLowerCase()))
@@ -175,25 +172,25 @@ export function MeetingPlanningWizard({
           Placeholder slots
         </p>
         {placeholders.map((p) => (
-          <div key={p.label} className="flex items-center justify-between border-b border-hairline py-2">
-            <span className="text-[13px]">
-              {p.label} <span className="text-ink-soft">({p.kind === "required" ? "Required" : "General"})</span>
-            </span>
-            <button type="button" onClick={() => removePlaceholder(p.label)} aria-label={`Remove ${p.label}`} className="text-ink-faint">
-              ✕
-            </button>
-          </div>
+          <ListRow key={p.label}>
+            <span className="text-[13px] font-medium">{p.label}</span>
+            <OptGroup
+              aria-label={`${p.label} status`}
+              options={CREW_STATE_OPTIONS}
+              value={p.kind}
+              onChange={(value) => {
+                if (value === "off") {
+                  removePlaceholder(p.label);
+                } else {
+                  setPlaceholders((prev) =>
+                    prev.map((x) => (x.label === p.label ? { ...x, kind: value } : x)),
+                  );
+                }
+              }}
+            />
+          </ListRow>
         ))}
         <div className="flex items-center gap-2.5 py-3">
-          <PillRow
-            aria-label="Placeholder kind"
-            value={newPlaceholderKind}
-            onChange={setNewPlaceholderKind}
-            options={[
-              { value: "required", label: "Required" },
-              { value: "general", label: "General" },
-            ]}
-          />
           <input
             value={newPlaceholderLabel}
             onChange={(e) => setNewPlaceholderLabel(e.target.value)}
@@ -346,7 +343,7 @@ export function MeetingPlanningWizard({
                     <div key={j} className="flex items-center justify-between text-[12px]">
                       <span>
                         {b.slot.kind === "member" ? b.slot.name : b.slot.label}{" "}
-                        <span className="text-ink-faint">({b.role === "required" ? "Required" : "General"})</span>
+                        <span className="text-ink-faint">({b.role === "required" ? "Required" : "Optional"})</span>
                       </span>
                       {b.tier ? (
                         <StatusDot tone={TIER_TONE[b.tier]} label={TIER_LABEL[b.tier]} />
@@ -390,7 +387,7 @@ export function MeetingPlanningWizard({
       <StepDots step={4} />
       <h2 className="font-display mb-1 text-xl font-bold italic text-burgundy">Confirm</h2>
       <p className="mb-5 text-[12.5px] text-ink-soft">
-        Tentative holds the date with no roster yet. Confirmed sends invites to everyone required or in.
+        Tentative holds the date with no roster yet. Confirmed sends invites to everyone required or optional.
       </p>
 
       {selected && (
