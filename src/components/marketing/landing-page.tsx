@@ -1,12 +1,22 @@
 import { Button } from "@/components/ui/button";
 
 const FEATURES = [
-  "Availability, half a day at a time (AM/PM), with manual overrides that always win over a recurring rule.",
-  "One grid to see who's free across the whole crew before a shoot date gets locked in.",
-  "Each film is its own space, crew and invites stay scoped to it.",
-  "Tentative and confirmed shoots show different things: what's needed to firm up, versus who's actually coming.",
-  "Sign in with an email code or a passkey, no password to set up.",
-  "Set a film's working dates once and every crew member's calendar bounds itself to that window.",
+  {
+    title: "See who's free",
+    body: "A shared grid shows the whole crew's availability before a shoot date gets locked in.",
+  },
+  {
+    title: "One space per film",
+    body: "Crew, working dates, and invites stay scoped to the film they belong to.",
+  },
+  {
+    title: "Tentative vs confirmed",
+    body: "A tentative shoot shows what still needs to firm up. A confirmed one shows who's actually coming.",
+  },
+  {
+    title: "Easy to join",
+    body: "Crew get an invite by email and are set up in a couple of taps, nothing to install.",
+  },
 ];
 
 export function LandingPage() {
@@ -25,10 +35,11 @@ export function LandingPage() {
           Scheduling for student and indie film crews.
         </p>
 
-        <ul className="mt-8 flex flex-col gap-4">
+        <ul className="mt-8 grid gap-x-8 gap-y-5 sm:grid-cols-2">
           {FEATURES.map((feature) => (
-            <li key={feature} className="border-t border-hairline pt-4 text-[14px] leading-relaxed text-ink-soft">
-              {feature}
+            <li key={feature.title} className="border-t border-hairline pt-4">
+              <p className="text-[13.5px] font-bold">{feature.title}</p>
+              <p className="mt-1 text-[13.5px] leading-relaxed text-ink-soft">{feature.body}</p>
             </li>
           ))}
         </ul>
@@ -39,13 +50,6 @@ export function LandingPage() {
           </Button>
         </div>
       </section>
-
-      <footer className="mt-auto flex items-center justify-between border-t border-hairline px-6 py-6 text-[13px] md:px-10">
-        <span className="font-display font-bold italic text-burgundy">Callsheet</span>
-        <a href="/sign-in" className="font-semibold text-burgundy">
-          Sign in
-        </a>
-      </footer>
     </div>
   );
 }
