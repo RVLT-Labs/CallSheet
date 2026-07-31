@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { StatusDot } from "@/components/ui/status-dot";
 import { HALF_DAY_LABEL } from "@/lib/half-day";
-import { canNudgeInvite, type InviteStatus } from "@/server/shoot-roster";
+import { canNudgeInvite, inviteStatusLabel, type InviteResponseSource, type InviteStatus } from "@/server/shoot-roster";
 
 import {
   nudgeInviteAction,
+  overrideInviteStatusAction,
   removePersonAction,
   setCallTimeOverrideAction,
 } from "@/app/shoots/[id]/actions";
@@ -20,11 +21,11 @@ const INVITE_TONE: Record<InviteStatus, "forest" | "burgundy" | "taupe"> = {
   pending: "taupe",
 };
 
-const INVITE_LABEL: Record<InviteStatus, string> = {
-  accepted: "Accepted",
-  declined: "Declined",
-  pending: "Pending",
-};
+const STATUS_OPTIONS: { status: InviteStatus; label: string }[] = [
+  { status: "accepted", label: "Accepted" },
+  { status: "declined", label: "Declined" },
+  { status: "pending", label: "Pending" },
+];
 
 type PersonSheetProps = {
   shootId: string;
@@ -33,6 +34,7 @@ type PersonSheetProps = {
     id: string;
     membershipId: string;
     status: InviteStatus;
+    responseSource: InviteResponseSource;
     lastReminderSentAt: string | null;
     overrides: { shootDayId: string; callTime: string }[];
   } | null;
@@ -59,7 +61,32 @@ export function PersonSheet({ shootId, memberName, invite, days, isOrganiser, on
     <Sheet open onClose={onClose} title={memberName}>
       {invite && (
         <div className="mb-4">
-          <StatusDot tone={INVITE_TONE[invite.status]} label={INVITE_LABEL[invite.status]} />
+          <StatusDot tone={INVITE_TONE[invite.status]} label={inviteStatusLabel(invite.status, invite.responseSource)} />
+        </div>
+      )}
+
+      {isOrganiser && invite && (
+        <div className="mb-4">
+          <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Set status</p>
+          <div className="flex gap-2">
+            {STATUS_OPTIONS.map((option) => (
+              <button
+                key={option.status}
+                type="button"
+                disabled={pending || invite.status === option.status}
+                onClick={() =>
+                  startTransition(() => overrideInviteStatusAction(shootId, invite.id, option.status))
+                }
+                className="flex-1 rounded-md border border-hairline px-2 py-1.5 text-[12px] font-semibold text-ink-soft disabled:border-burgundy disabled:text-burgundy"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] italic text-ink-faint">
+            Overrides {memberName}&apos;s response. If they respond via their own invite link afterward, their
+            response wins.
+          </p>
         </div>
       )}
 

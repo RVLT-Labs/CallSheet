@@ -6,10 +6,12 @@ import { requireActiveOrganiserFilm } from "@/server/organiser";
 import {
   confirmShoot as confirmShootDetail,
   nudgeInvite,
+  overrideInviteStatus,
   removePersonFromShoot,
   setCallTimeOverride,
   updateShootDetails,
 } from "@/server/shoot-detail";
+import type { InviteStatus } from "@/server/shoot-roster";
 
 export async function confirmShootAction(shootId: string) {
   const { organizationId } = await requireActiveOrganiserFilm();
@@ -42,6 +44,12 @@ export async function nudgeInviteAction(shootId: string, inviteId: string) {
 export async function removePersonAction(shootId: string, membershipId: string) {
   await requireActiveOrganiserFilm();
   await removePersonFromShoot(shootId, membershipId);
+  revalidatePath(`/shoots/${shootId}`);
+}
+
+export async function overrideInviteStatusAction(shootId: string, inviteId: string, status: InviteStatus) {
+  const { organizationId, membership } = await requireActiveOrganiserFilm();
+  await overrideInviteStatus(shootId, organizationId, inviteId, status, membership.id);
   revalidatePath(`/shoots/${shootId}`);
 }
 

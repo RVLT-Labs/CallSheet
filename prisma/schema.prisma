@@ -16,15 +16,15 @@ datasource db {
 // ---------- Better Auth core ----------
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  emailVerified Boolean  @default(false)
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified Boolean   @default(false)
   name          String
   image         String?
   phone         String? // day-of contact only, never used for auth (spec §4.2a)
   onboardedAt   DateTime? // set when a self-signup user (no invite) finishes the welcome flow — creating their first film — so it never replays
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   sessions Session[]
   accounts Account[]
@@ -94,14 +94,14 @@ model Organization {
   createdAt DateTime @default(now())
 
   // additionalFields — film-specific data per spec §4.2 / §6, not a parallel Film table
-  company                 String? // production company/society, e.g. "UNSW MTS" (design: style-board-v13-film-creation.html)
-  dateRangeStart          DateTime?
-  dateRangeEnd            DateTime?
-  posterUrl               String?
-  status                  FilmStatus @default(active)
-  showTentativeToCrew     Boolean    @default(false)
-  showCrewContactsToCrew  Boolean    @default(false)
-  showAvailabilityToCrew  Boolean    @default(false)
+  company                String? // production company/society, e.g. "UNSW MTS" (design: style-board-v13-film-creation.html)
+  dateRangeStart         DateTime?
+  dateRangeEnd           DateTime?
+  posterUrl              String?
+  status                 FilmStatus @default(active)
+  showTentativeToCrew    Boolean    @default(false)
+  showCrewContactsToCrew Boolean    @default(false)
+  showAvailabilityToCrew Boolean    @default(false)
 
   members     Member[]
   invitations Invitation[]
@@ -123,10 +123,11 @@ model Member {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  availability     Availability[]
-  recurringRules   RecurringAvailabilityRule[]
-  shootInvites     ShootInvite[]
-  requiredOnSlots  ShootSlot[]
+  availability      Availability[]
+  recurringRules    RecurringAvailabilityRule[]
+  shootInvites      ShootInvite[]
+  overriddenInvites ShootInvite[]               @relation("InviteOverriddenBy")
+  requiredOnSlots   ShootSlot[]
 
   @@unique([organizationId, userId])
   @@map("member")
@@ -183,7 +184,7 @@ model Availability {
   updatedAt    DateTime           @updatedAt
 
   membership Member                     @relation(fields: [membershipId], references: [id], onDelete: Cascade)
-  sourceRule  RecurringAvailabilityRule? @relation(fields: [sourceRuleId], references: [id], onDelete: SetNull)
+  sourceRule RecurringAvailabilityRule? @relation(fields: [sourceRuleId], references: [id], onDelete: SetNull)
 
   // one tier per person/date/half-day — manual entries overwrite in place rather than stacking rows
   @@unique([membershipId, date, halfDay])
@@ -194,16 +195,16 @@ model Availability {
 // A recurring rule generates/refreshes Availability rows with source = recurring.
 // A manual Availability row on a matching date always takes precedence (spec §10).
 model RecurringAvailabilityRule {
-  id              String           @id @default(cuid())
-  membershipId    String
-  dayOfWeek       Int // 0 (Sunday) - 6 (Saturday)
-  halfDay         HalfDay? // null = both AM and PM
-  tier            AvailabilityTier
-  label           String?
-  effectiveStart  DateTime         @db.Date
-  effectiveEnd    DateTime?        @db.Date // defaults to the film's working window when unset
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id             String           @id @default(cuid())
+  membershipId   String
+  dayOfWeek      Int // 0 (Sunday) - 6 (Saturday)
+  halfDay        HalfDay? // null = both AM and PM
+  tier           AvailabilityTier
+  label          String?
+  effectiveStart DateTime         @db.Date
+  effectiveEnd   DateTime?        @db.Date // defaults to the film's working window when unset
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   membership            Member         @relation(fields: [membershipId], references: [id], onDelete: Cascade)
   generatedAvailability Availability[]
@@ -281,24 +282,37 @@ enum InviteStatus {
   declined
 }
 
+// Who last set an invite's status — mirrors Availability.source (manual overrides
+// recurring): an organiser override always shows as organiser-set until the crew
+// member responds via their own accept/decline link, which always wins and resets
+// this back to crew (see respondToInvite in shoot-invite-email.ts).
+enum InviteResponseSource {
+  crew
+  organiser
+}
+
 model ShootInvite {
-  id                 String       @id @default(cuid())
-  shootId            String
-  membershipId       String
-  status             InviteStatus @default(pending)
-  token              String       @unique // signed/random token for no-login accept/decline links (spec §7)
-  sentAt             DateTime?
-  respondedAt        DateTime?
-  lastReminderSentAt DateTime?
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  id                       String               @id @default(cuid())
+  shootId                  String
+  membershipId             String
+  status                   InviteStatus         @default(pending)
+  responseSource           InviteResponseSource @default(crew)
+  overriddenByMembershipId String? // organiser who last set the status, when responseSource = organiser
+  token                    String               @unique // signed/random token for no-login accept/decline links (spec §7)
+  sentAt                   DateTime?
+  respondedAt              DateTime?
+  lastReminderSentAt       DateTime?
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
 
   shoot            Shoot              @relation(fields: [shootId], references: [id], onDelete: Cascade)
   membership       Member             @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  overriddenBy     Member?            @relation("InviteOverriddenBy", fields: [overriddenByMembershipId], references: [id], onDelete: SetNull)
   callTimeOverride CallTimeOverride[]
 
   @@unique([shootId, membershipId])
   @@index([membershipId])
+  @@index([overriddenByMembershipId])
 }
 
 // Per-person, per-day call time override (spec §4.6) — falls back to ShootDay.defaultCallTime when absent.

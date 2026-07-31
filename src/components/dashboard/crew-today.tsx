@@ -5,9 +5,9 @@ import { PageShell } from "@/components/ui/page-shell";
 import { StatusDot } from "@/components/ui/status-dot";
 import { NOTHING_SCHEDULED_COPY } from "@/lib/my-shoots-rules";
 import type { MyShoot } from "@/server/my-shoots";
+import { inviteStatusLabel } from "@/server/shoot-roster";
 
 const INVITE_TONE = { accepted: "forest", declined: "burgundy", pending: "taupe" } as const;
-const INVITE_LABEL = { accepted: "Accepted", declined: "Declined", pending: "Pending" } as const;
 
 function dateLabel(dateIsos: string[]) {
   if (dateIsos.length === 0) return "No date set";
@@ -44,7 +44,10 @@ export function CrewToday({ filmName, upcoming }: { filmName: string; upcoming: 
                 {shoot.status === "tentative" ? (
                   <span className="text-[12px] italic text-terracotta">Hold, not booked</span>
                 ) : shoot.inviteStatus ? (
-                  <StatusDot tone={INVITE_TONE[shoot.inviteStatus]} label={INVITE_LABEL[shoot.inviteStatus]} />
+                  <StatusDot
+                    tone={INVITE_TONE[shoot.inviteStatus]}
+                    label={inviteStatusLabel(shoot.inviteStatus, shoot.inviteResponseSource ?? "crew")}
+                  />
                 ) : null}
               </Link>
             ))}

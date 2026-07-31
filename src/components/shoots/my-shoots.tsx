@@ -14,9 +14,9 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { StickyFooterAction } from "@/components/ui/sticky-footer-action";
 import { NOTHING_SCHEDULED_COPY, needsStickyAcceptAllFooter, splitSoonestPending } from "@/lib/my-shoots-rules";
 import type { MyShoot } from "@/server/my-shoots";
+import { inviteStatusLabel } from "@/server/shoot-roster";
 
 const INVITE_TONE = { accepted: "forest", declined: "burgundy", pending: "taupe" } as const;
-const INVITE_LABEL = { accepted: "Accepted", declined: "Declined", pending: "Pending" } as const;
 
 function dateLabel(dateIsos: string[]) {
   if (dateIsos.length === 0) return "No date set";
@@ -29,7 +29,9 @@ function applyInviteResponse(
   update: { inviteIds: string[]; status: "accepted" | "declined" },
 ): MyShoot[] {
   return state.map((s) =>
-    s.inviteId && update.inviteIds.includes(s.inviteId) ? { ...s, inviteStatus: update.status } : s,
+    s.inviteId && update.inviteIds.includes(s.inviteId)
+      ? { ...s, inviteStatus: update.status, inviteResponseSource: "crew" }
+      : s,
   );
 }
 
@@ -164,7 +166,10 @@ export function MyShoots({ upcoming, past }: { upcoming: MyShoot[]; past: MyShoo
               {shoot.status === "tentative" ? (
                 <span className="text-[12px] italic text-terracotta">Hold, not booked</span>
               ) : shoot.inviteStatus ? (
-                <StatusDot tone={INVITE_TONE[shoot.inviteStatus]} label={INVITE_LABEL[shoot.inviteStatus]} />
+                <StatusDot
+                  tone={INVITE_TONE[shoot.inviteStatus]}
+                  label={inviteStatusLabel(shoot.inviteStatus, shoot.inviteResponseSource ?? "crew")}
+                />
               ) : null}
             </Link>
           ))}

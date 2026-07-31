@@ -66,6 +66,7 @@ export default async function ShootDetailPage({ params }: { params: Promise<{ id
       membershipId: inv.membershipId,
       memberName: inv.membership.user.name,
       status: inv.status,
+      responseSource: inv.responseSource,
       lastReminderSentAt: inv.lastReminderSentAt ? inv.lastReminderSentAt.toISOString() : null,
       overrides: inv.callTimeOverride.map((o) => ({ shootDayId: o.shootDayId, callTime: o.callTime })),
     })),

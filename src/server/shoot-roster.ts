@@ -4,6 +4,11 @@
 
 export type InviteStatus = "pending" | "accepted" | "declined";
 
+// Who last set an invite's status — mirrors the availability manual-overrides-recurring
+// precedence rule: an organiser override holds until the crew member responds via their
+// own accept/decline link, which always wins (see respondToInvite in shoot-invite-email.ts).
+export type InviteResponseSource = "crew" | "organiser";
+
 /** Per-person call-time override falls back to that day's default when unset. */
 export function resolveEffectiveCallTime(dayDefaultCallTime: string, override: string | null | undefined) {
   return override && override.length > 0 ? override : dayDefaultCallTime;
@@ -22,6 +27,18 @@ export function canNudgeInvite(status: InviteStatus) {
  */
 export function removalOutcomeForInvite(status: InviteStatus | null): "hard-delete" | "soft-remove" {
   return status === "accepted" || status === "declined" ? "soft-remove" : "hard-delete";
+}
+
+const INVITE_STATUS_LABEL: Record<InviteStatus, string> = {
+  pending: "Pending",
+  accepted: "Accepted",
+  declined: "Declined",
+};
+
+/** Flags an organiser-set status in the label everywhere it's shown, so it never reads as the crew member's own response. */
+export function inviteStatusLabel(status: InviteStatus, responseSource: InviteResponseSource) {
+  const base = INVITE_STATUS_LABEL[status];
+  return responseSource === "organiser" ? `${base} (set by organiser)` : base;
 }
 
 export type RsvpCounts = { accepted: number; declined: number; pending: number };

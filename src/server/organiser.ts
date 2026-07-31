@@ -21,5 +21,5 @@ export async function requireActiveOrganiserFilm() {
 
   if (!membership || membership.role === "member") redirect("/");
 
-  return { session, organizationId, film };
+  return { session, organizationId, film, membership };
 }

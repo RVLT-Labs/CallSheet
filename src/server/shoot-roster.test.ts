@@ -4,6 +4,7 @@ import {
   REMINDER_THRESHOLD_DAYS,
   canNudgeInvite,
   countRsvpStatuses,
+  inviteStatusLabel,
   isInviteDueForReminder,
   removalOutcomeForInvite,
   resolveEffectiveCallTime,
@@ -56,6 +57,20 @@ describe("countRsvpStatuses", () => {
 
   it("returns zeros for an empty roster", () => {
     expect(countRsvpStatuses([])).toEqual({ accepted: 0, declined: 0, pending: 0 });
+  });
+});
+
+describe("inviteStatusLabel", () => {
+  it("shows the plain status when it came from the crew member's own response", () => {
+    expect(inviteStatusLabel("accepted", "crew")).toBe("Accepted");
+    expect(inviteStatusLabel("declined", "crew")).toBe("Declined");
+    expect(inviteStatusLabel("pending", "crew")).toBe("Pending");
+  });
+
+  it("flags a status the organiser set manually, so it never reads as the crew member's own response", () => {
+    expect(inviteStatusLabel("accepted", "organiser")).toBe("Accepted (set by organiser)");
+    expect(inviteStatusLabel("declined", "organiser")).toBe("Declined (set by organiser)");
+    expect(inviteStatusLabel("pending", "organiser")).toBe("Pending (set by organiser)");
   });
 });
 

@@ -11,7 +11,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { TextField } from "@/components/ui/text-field";
 import { TextAreaField } from "@/components/ui/textarea-field";
 import { HALF_DAY_LABEL } from "@/lib/half-day";
-import { countRsvpStatuses, type InviteStatus } from "@/server/shoot-roster";
+import { countRsvpStatuses, inviteStatusLabel, type InviteResponseSource, type InviteStatus } from "@/server/shoot-roster";
 
 import {
   confirmShootAction,
@@ -41,6 +41,7 @@ export type ShootDetailData = {
     membershipId: string;
     memberName: string;
     status: InviteStatus;
+    responseSource: InviteResponseSource;
     lastReminderSentAt: string | null;
     overrides: { shootDayId: string; callTime: string }[];
   }[];
@@ -51,12 +52,6 @@ const INVITE_TONE: Record<InviteStatus, "forest" | "burgundy" | "taupe"> = {
   accepted: "forest",
   declined: "burgundy",
   pending: "taupe",
-};
-
-const INVITE_LABEL: Record<InviteStatus, string> = {
-  accepted: "Accepted",
-  declined: "Declined",
-  pending: "Pending",
 };
 
 function dateRangeLabel(dayIsos: string[]) {
@@ -165,7 +160,10 @@ export function ShootDetailView({ shoot, isOrganiser }: { shoot: ShootDetailData
                         {slot.kind === "required" && <RequiredMarker />}
                       </span>
                       {invite ? (
-                        <StatusDot tone={INVITE_TONE[invite.status]} label={INVITE_LABEL[invite.status]} />
+                        <StatusDot
+                          tone={INVITE_TONE[invite.status]}
+                          label={inviteStatusLabel(invite.status, invite.responseSource)}
+                        />
                       ) : (
                         <span className="text-[12px] text-ink-faint">No invite</span>
                       )}
