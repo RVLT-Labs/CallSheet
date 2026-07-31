@@ -58,11 +58,14 @@ export function EmailCodeFlow({ callbackURL, invite }: EmailCodeFlowProps) {
     setVerifying(true);
     setError(null);
     const { error } = await authClient.signIn.emailOtp({ email, otp });
-    setVerifying(false);
     if (error) {
+      setVerifying(false);
       setError("That code isn't right or has expired. Try again.");
       return;
     }
+    // Stay "Verifying…" through the redirect instead of flipping back to
+    // "Sign in" first — otherwise the button looks done while the next
+    // page is still loading, and the app looks frozen for a beat.
     router.push(callbackURL);
   }
 

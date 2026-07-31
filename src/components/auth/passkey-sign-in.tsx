@@ -25,11 +25,13 @@ export function PasskeySignIn({ callbackURL }: PasskeySignInProps) {
     setPending(true);
     setError(null);
     const { error } = await authClient.signIn.passkey();
-    setPending(false);
     if (error) {
+      setPending(false);
       setError("Couldn't sign in with a passkey. Use your email instead.");
       return;
     }
+    // Stay pending through the redirect rather than resetting first — see
+    // email-code-flow.tsx for why.
     router.push(callbackURL);
   }
 
