@@ -50,13 +50,6 @@ export function LandingPage() {
           </Button>
         </div>
       </section>
-
-      <footer className="mt-auto flex items-center justify-between border-t border-hairline px-6 py-6 text-[13px] md:px-10">
-        <span className="font-display font-bold italic text-burgundy">Callsheet</span>
-        <a href="/sign-in" className="font-semibold text-burgundy">
-          Sign in
-        </a>
-      </footer>
     </div>
   );
 }
