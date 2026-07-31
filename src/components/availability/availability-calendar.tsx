@@ -367,12 +367,7 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
   const selectedDay = selectedDate ? daysByIso.get(selectedDate) : undefined;
 
   return (
-    <div
-      onPointerUp={endDrag}
-      onPointerLeave={dragStartedFresh ? undefined : endDrag}
-      onPointerMove={onContainerPointerMove}
-      className="touch-none select-none"
-    >
+    <div>
       <div className="mb-3 flex items-center justify-between">
         <button
           type="button"
@@ -408,8 +403,13 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
         </p>
       )}
 
-      <div className="overflow-hidden rounded-lg border-l border-t border-hairline">
-        <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_44px] bg-cream-deep">
+      <div
+        onPointerUp={endDrag}
+        onPointerLeave={dragStartedFresh ? undefined : endDrag}
+        onPointerMove={onContainerPointerMove}
+        className="touch-none select-none overflow-hidden rounded-lg border-l border-t border-hairline"
+      >
+        <div className="grid grid-cols-7 bg-cream-deep md:grid-cols-[repeat(7,minmax(0,1fr))_44px]">
           {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
             <span
               key={i}
@@ -418,11 +418,11 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
               {d}
             </span>
           ))}
-          <span className="border-b border-r border-hairline" />
+          <span className="hidden border-b border-r border-hairline md:block" />
         </div>
 
         {weeks.map((week, i) => (
-          <div key={i} className="grid grid-cols-[repeat(7,minmax(0,1fr))_44px]">
+          <div key={i} className="grid grid-cols-7 md:grid-cols-[repeat(7,minmax(0,1fr))_44px]">
             {week.map((cell, j) => (
               <DayCell
                 key={cell?.dateIso ?? `blank-${i}-${j}`}
@@ -440,14 +440,14 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
               <button
                 type="button"
                 onClick={() => markWeek(week)}
-                className="border-b border-r border-hairline text-[9px] font-semibold leading-tight text-burgundy"
+                className="hidden border-b border-r border-hairline text-[9px] font-semibold leading-tight text-burgundy md:block"
               >
                 Mark
                 <br />
                 week
               </button>
             ) : (
-              <span className="border-b border-r border-hairline" />
+              <span className="hidden border-b border-r border-hairline md:block" />
             )}
           </div>
         ))}
