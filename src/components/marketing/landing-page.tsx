@@ -5,7 +5,7 @@ const FEATURES = [
   "One grid to see who's free across the whole crew before a shoot date gets locked in.",
   "Each film is its own space, crew and invites stay scoped to it.",
   "Tentative and confirmed shoots show different things: what's needed to firm up, versus who's actually coming.",
-  "Sign in with a magic link, no password to set up.",
+  "Sign in with an email code or a passkey, no password to set up.",
   "Set a film's working dates once and every crew member's calendar bounds itself to that window.",
 ];
 

@@ -199,28 +199,24 @@ export function renderReminderEmail(params: { recipientName: string; eventTitle:
   return { subject: `Reminder: ${eventTitle}`, html, text };
 }
 
-export function renderMagicLinkEmail(params: { url: string }) {
-  const { url } = params;
+export function renderEmailCodeEmail(params: { otp: string }) {
+  const { otp } = params;
 
   const html = shell(`
     <p style="margin:0 0 6px 0;font-family:${DISPLAY_FONT};font-style:italic;font-weight:bold;font-size:22px;color:${COLOR.ink};text-align:center;">Sign in to Callsheet</p>
-    <p style="margin:0 0 28px 0;font-family:${BODY_FONT};font-size:13.5px;line-height:1.6;color:${COLOR.inkSoft};text-align:center;">Tap below to sign in. This link expires shortly and only works once.</p>
-    <div style="text-align:center;margin-bottom:24px;">
-      ${button("Sign in to Callsheet", url, "primary")}
-    </div>
-    <p style="margin:0 0 8px 0;font-family:${BODY_FONT};font-size:12px;color:${COLOR.inkSoft};text-align:center;">Or paste this link into your browser:</p>
-    <p style="margin:0 0 28px 0;padding:12px 14px;background-color:${COLOR.cream};border:1px solid ${COLOR.hairline};border-radius:8px;font-family:${MONO_FONT};font-size:11.5px;line-height:1.5;color:${COLOR.ink};word-break:break-all;text-align:center;">${url}</p>
+    <p style="margin:0 0 24px 0;font-family:${BODY_FONT};font-size:13.5px;line-height:1.6;color:${COLOR.inkSoft};text-align:center;">Enter this code to sign in. It expires shortly and only works once.</p>
+    <p style="margin:0 0 28px 0;padding:16px 14px;background-color:${COLOR.cream};border:1px solid ${COLOR.hairline};border-radius:8px;font-family:${MONO_FONT};font-size:28px;font-weight:bold;letter-spacing:8px;color:${COLOR.ink};text-align:center;">${otp}</p>
     <p style="margin:0;padding-top:20px;border-top:1px solid ${COLOR.hairline};font-family:${BODY_FONT};font-size:11.5px;line-height:1.6;color:${COLOR.inkFaint};text-align:center;">Didn't request this? You can safely ignore this email — no changes were made to your account.</p>
   `);
 
   const text = [
     "Sign in to Callsheet",
-    "Tap the link below to sign in. This link expires shortly and only works once.",
-    url,
+    "Enter this code to sign in. It expires shortly and only works once.",
+    otp,
     "Didn't request this? You can safely ignore this email — no changes were made to your account.",
   ].join("\n\n");
 
-  return { subject: "Your Callsheet sign-in link", html, text };
+  return { subject: "Your Callsheet sign-in code", html, text };
 }
 
 export function renderCrewInvitationEmail(params: {
@@ -245,7 +241,7 @@ export function renderCrewInvitationEmail(params: {
     <div style="text-align:center;margin:28px 0 20px 0;">
       ${button("Accept & set your availability", url, "primary")}
     </div>
-    <p style="margin:0;padding-top:20px;border-top:1px solid ${COLOR.hairline};font-family:${BODY_FONT};font-size:11.5px;line-height:1.6;color:${COLOR.inkFaint};text-align:center;">We'll send a sign-in link to this address. Accepting logs you straight in, no password needed.</p>
+    <p style="margin:0;padding-top:20px;border-top:1px solid ${COLOR.hairline};font-family:${BODY_FONT};font-size:11.5px;line-height:1.6;color:${COLOR.inkFaint};text-align:center;">We'll email you a sign-in code for this address, no password needed.</p>
   `);
 
   const text = [

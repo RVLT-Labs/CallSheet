@@ -1,6 +1,6 @@
 // Prisma schema for Callsheet.
-// Auth tables (User, Session, Account, Verification, Organization, Member, Invitation)
-// follow Better Auth's expected shape exactly — see node_modules/better-auth core/organization
+// Auth tables (User, Session, Account, Verification, Passkey, Organization, Member, Invitation)
+// follow Better Auth's expected shape exactly — see node_modules/better-auth core/organization/passkey
 // schema source, not the docs, since field names must match precisely for the adapter to work.
 // Film = Organization, Membership = Member (Better Auth's Organization plugin), per spec §4.1.
 
@@ -29,6 +29,7 @@ model User {
   sessions Session[]
   accounts Account[]
   members  Member[]
+  passkeys Passkey[]
 }
 
 model Session {
@@ -76,6 +77,28 @@ model Verification {
   updatedAt  DateTime @updatedAt
 
   @@index([identifier])
+}
+
+// ---------- Better Auth passkey plugin ----------
+
+model Passkey {
+  id           String    @id @default(cuid())
+  name         String?
+  publicKey    String
+  userId       String
+  credentialID String
+  counter      Int
+  deviceType   String
+  backedUp     Boolean
+  transports   String?
+  createdAt    DateTime? @default(now())
+  aaguid       String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([credentialID])
+  @@map("passkey")
 }
 
 // ---------- Better Auth organization plugin (Film = Organization) ----------
