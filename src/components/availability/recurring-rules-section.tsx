@@ -56,7 +56,7 @@ export function RecurringRulesSection({
 
       {rules.length === 0 && (
         <p className="mb-3 text-[12.5px] text-ink-soft">
-          No recurring rules yet. Add one for a schedule that repeats every week, like a standing rehearsal.
+          No recurring rules yet. Add one for a schedule that repeats every week, like a weekly class or shift.
         </p>
       )}
 

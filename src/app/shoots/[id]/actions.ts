@@ -24,6 +24,9 @@ export async function updateShootDetailsAction(
   data: {
     title?: string;
     locationAddress?: string;
+    locationPlaceId?: string | null;
+    locationLat?: number | null;
+    locationLng?: number | null;
     locationMapUrl?: string;
     locationNotes?: string;
     notes?: string;

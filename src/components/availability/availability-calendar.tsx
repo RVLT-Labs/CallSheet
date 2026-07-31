@@ -57,6 +57,20 @@ function buildMonthWeeks(year: number, month: number, windowStart: string, windo
   return weeks;
 }
 
+/** All in-window dates between two ISO dates (inclusive), in either order. For shift-click range select. */
+function buildDateRange(aIso: string, bIso: string, windowStart: string, windowEnd: string) {
+  const [startIso, endIso] = aIso <= bIso ? [aIso, bIso] : [bIso, aIso];
+  const dates: string[] = [];
+  let cursor = parseIsoDateUtc(startIso);
+  const end = parseIsoDateUtc(endIso);
+  while (cursor <= end) {
+    const iso = toIsoDate(cursor);
+    if (iso >= windowStart && iso <= windowEnd) dates.push(iso);
+    cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000);
+  }
+  return dates;
+}
+
 function dayLabel(dateIso: string) {
   return parseIsoDateUtc(dateIso).toLocaleDateString("en-US", {
     weekday: "long",
@@ -228,9 +242,11 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
   const [dragging, setDragging] = useState(false);
   const [dragStartedFresh, setDragStartedFresh] = useState(true);
   const [bulkSelection, setBulkSelection] = useState<string[] | null>(null);
+  const [rangeAnchor, setRangeAnchor] = useState<string | null>(null);
   const [optimisticDays, applyOptimisticDays] = useOptimistic(days, applyTierUpdate);
   const [isSaving, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [todayIso] = useState(() => toIsoDate(new Date()));
 
   const daysByIso = useMemo(() => new Map(optimisticDays.map((d) => [d.dateIso, d])), [optimisticDays]);
 
@@ -248,17 +264,38 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
     setViewMonth(next.getUTCMonth());
   }
 
-  function onDayDown(dateIso: string) {
+  function onDayDown(dateIso: string, shiftKey: boolean) {
+    if (shiftKey && rangeAnchor) {
+      const range = buildDateRange(rangeAnchor, dateIso, windowStart, windowEnd);
+      setBulkSelection(range.length > 1 ? range : null);
+      setSelectedDate(range.length === 1 ? range[0] : null);
+      setDragging(false);
+      setTouched(new Set());
+      return;
+    }
     setDragging(true);
     setDragStartedFresh(true);
     setTouched(new Set([dateIso]));
     setBulkSelection(null);
+    setRangeAnchor(dateIso);
   }
 
   function onDayEnter(dateIso: string) {
     if (!dragging) return;
     setDragStartedFresh(false);
     setTouched((prev) => new Set(prev).add(dateIso));
+  }
+
+  // Touch browsers don't re-target pointermove/pointerenter to the element under the
+  // finger the way mouse drags do (the pointer effectively stays locked to the cell that
+  // received pointerdown), so onDayEnter above never fires from a touch drag. Hit-testing
+  // the pointer's screen position directly on every move sidesteps that and makes touch
+  // drag-select behave the same as mouse drag-select.
+  function onContainerPointerMove(e: { clientX: number; clientY: number }) {
+    if (!dragging) return;
+    const target = document.elementFromPoint(e.clientX, e.clientY);
+    const cellEl = target instanceof Element ? target.closest<HTMLElement>("[data-date]") : null;
+    if (cellEl?.dataset.inWindow && cellEl.dataset.date) onDayEnter(cellEl.dataset.date);
   }
 
   function endDrag() {
@@ -281,6 +318,7 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
     if (dateIsos.length === 0) return;
     setBulkSelection(dateIsos);
     setSelectedDate(null);
+    setRangeAnchor(dateIsos[0]);
   }
 
   function cellsForTarget(dateIsos: string[], target: TargetHalf) {
@@ -329,7 +367,12 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
   const selectedDay = selectedDate ? daysByIso.get(selectedDate) : undefined;
 
   return (
-    <div onPointerUp={endDrag} onPointerLeave={dragStartedFresh ? undefined : endDrag} className="touch-none select-none">
+    <div
+      onPointerUp={endDrag}
+      onPointerLeave={dragStartedFresh ? undefined : endDrag}
+      onPointerMove={onContainerPointerMove}
+      className="touch-none select-none"
+    >
       <div className="mb-3 flex items-center justify-between">
         <button
           type="button"
@@ -365,17 +408,21 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
         </p>
       )}
 
-      <div className="grid grid-cols-7 gap-1 text-center">
-        {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
-          <span key={i} className="text-[10px] font-bold uppercase text-ink-faint">
-            {d}
-          </span>
-        ))}
-      </div>
+      <div className="overflow-hidden rounded-lg border-l border-t border-hairline">
+        <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_44px] bg-cream-deep">
+          {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+            <span
+              key={i}
+              className="border-b border-r border-hairline py-1.5 text-center text-[10px] font-bold uppercase text-ink-faint"
+            >
+              {d}
+            </span>
+          ))}
+          <span className="border-b border-r border-hairline" />
+        </div>
 
-      {weeks.map((week, i) => (
-        <div key={i} className="mt-1 flex items-center gap-1">
-          <div className="grid flex-1 grid-cols-7 gap-1">
+        {weeks.map((week, i) => (
+          <div key={i} className="grid grid-cols-[repeat(7,minmax(0,1fr))_44px]">
             {week.map((cell, j) => (
               <DayCell
                 key={cell?.dateIso ?? `blank-${i}-${j}`}
@@ -383,23 +430,28 @@ export function AvailabilityCalendar({ windowStart, windowEnd, days, rules }: Av
                 am={cell ? (daysByIso.get(cell.dateIso)?.am ?? null) : null}
                 pm={cell ? (daysByIso.get(cell.dateIso)?.pm ?? null) : null}
                 isSelected={cell?.dateIso === selectedDate}
+                isToday={cell?.dateIso === todayIso}
                 isTouched={!!cell && touched.has(cell.dateIso)}
                 onPointerDown={onDayDown}
                 onPointerEnter={onDayEnter}
               />
             ))}
+            {week.some((c) => c?.inWindow) ? (
+              <button
+                type="button"
+                onClick={() => markWeek(week)}
+                className="border-b border-r border-hairline text-[9px] font-semibold leading-tight text-burgundy"
+              >
+                Mark
+                <br />
+                week
+              </button>
+            ) : (
+              <span className="border-b border-r border-hairline" />
+            )}
           </div>
-          {week.some((c) => c?.inWindow) && (
-            <button
-              type="button"
-              onClick={() => markWeek(week)}
-              className="w-11 shrink-0 text-[9.5px] font-semibold leading-tight text-burgundy"
-            >
-              Mark week
-            </button>
-          )}
-        </div>
-      ))}
+        ))}
+      </div>
 
       <div className="mt-3 flex items-center gap-4 text-[10.5px] text-ink-soft">
         <span className="flex items-center gap-1.5">

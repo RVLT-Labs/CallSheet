@@ -94,14 +94,14 @@ model Organization {
   createdAt DateTime @default(now())
 
   // additionalFields — film-specific data per spec §4.2 / §6, not a parallel Film table
-  company                String? // production company/society, e.g. "UNSW MTS" (design: style-board-v13-film-creation.html)
-  dateRangeStart         DateTime?
-  dateRangeEnd           DateTime?
-  posterUrl              String?
-  status                 FilmStatus @default(active)
-  showTentativeToCrew    Boolean    @default(false)
-  showCrewContactsToCrew Boolean    @default(false)
-  showAvailabilityToCrew Boolean    @default(false)
+  company                 String? // production company, e.g. "Late Bloom Pictures" (design: style-board-v13-film-creation.html)
+  dateRangeStart          DateTime?
+  dateRangeEnd            DateTime?
+  posterUrl               String?
+  status                  FilmStatus @default(active)
+  showTentativeToCrew     Boolean    @default(false)
+  showCrewContactsToCrew  Boolean    @default(false)
+  showAvailabilityToCrew  Boolean    @default(false)
 
   members     Member[]
   invitations Invitation[]
@@ -225,7 +225,10 @@ model Shoot {
   status          ShootStatus @default(tentative)
   title           String? // organiser-set label for the header stack (design: v17-shoot-detail-clean); falls back to the date range when unset
   locationAddress String?
-  locationMapUrl  String?
+  locationPlaceId String? // Google Places place_id backing locationAddress, when set via the Places autocomplete picker (issue #22: keep location structured, not just a flat string)
+  locationLat     Float?
+  locationLng     Float?
+  locationMapUrl  String? // auto-filled from the picked place; still a plain editable field for a manually pasted link when Places isn't used
   locationNotes   String? // parking, nearest hospital, etc — free text for now (spec §4.6)
   notes           String?
   icsUid          String      @unique @default(cuid()) // stable across edits so calendar apps update, not duplicate

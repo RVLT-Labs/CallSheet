@@ -12,6 +12,8 @@ import { TextField } from "@/components/ui/text-field";
 import { TextAreaField } from "@/components/ui/textarea-field";
 import { HALF_DAY_LABEL } from "@/lib/half-day";
 import { countRsvpStatuses, inviteStatusLabel, type InviteResponseSource, type InviteStatus } from "@/server/shoot-roster";
+import { LocationMap } from "@/components/shoots/location-map";
+import { LocationPicker, type LocationFields } from "@/components/shoots/location-picker";
 
 import {
   confirmShootAction,
@@ -24,6 +26,9 @@ export type ShootDetailData = {
   status: "tentative" | "confirmed";
   title: string | null;
   locationAddress: string | null;
+  locationPlaceId: string | null;
+  locationLat: number | null;
+  locationLng: number | null;
   locationMapUrl: string | null;
   locationNotes: string | null;
   dayIsos: string[];
@@ -201,6 +206,9 @@ export function ShootDetailView({ shoot, isOrganiser }: { shoot: ShootDetailData
               Open map
             </a>
           )}
+          {shoot.locationLat != null && shoot.locationLng != null && (
+            <LocationMap lat={shoot.locationLat} lng={shoot.locationLng} />
+          )}
           {shoot.locationNotes && <p className="mt-2 text-[12px] text-ink-soft">{shoot.locationNotes}</p>}
         </div>
       </div>
@@ -225,8 +233,13 @@ export function ShootDetailView({ shoot, isOrganiser }: { shoot: ShootDetailData
 
 function EditDetailsForm({ shoot, onSaved }: { shoot: ShootDetailData; onSaved: () => void }) {
   const [title, setTitle] = useState(shoot.title ?? "");
-  const [locationAddress, setLocationAddress] = useState(shoot.locationAddress ?? "");
-  const [locationMapUrl, setLocationMapUrl] = useState(shoot.locationMapUrl ?? "");
+  const [location, setLocation] = useState<LocationFields>({
+    locationAddress: shoot.locationAddress ?? "",
+    locationMapUrl: shoot.locationMapUrl ?? "",
+    locationPlaceId: shoot.locationPlaceId,
+    locationLat: shoot.locationLat,
+    locationLng: shoot.locationLng,
+  });
   const [locationNotes, setLocationNotes] = useState(shoot.locationNotes ?? "");
   const [callTimes, setCallTimes] = useState<Record<string, string>>(
     Object.fromEntries(shoot.days.map((d) => [d.id, d.defaultCallTime])),
@@ -237,8 +250,7 @@ function EditDetailsForm({ shoot, onSaved }: { shoot: ShootDetailData; onSaved: 
     setSaving(true);
     await updateShootDetailsAction(shoot.id, {
       title,
-      locationAddress,
-      locationMapUrl,
+      ...location,
       locationNotes,
       dayCallTimes: shoot.days.map((d) => ({ dayId: d.id, defaultCallTime: callTimes[d.id] ?? d.defaultCallTime })),
     });
@@ -249,8 +261,14 @@ function EditDetailsForm({ shoot, onSaved }: { shoot: ShootDetailData; onSaved: 
   return (
     <div>
       <TextField label="Title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Rooftop chase scene" />
-      <TextField label="Location address" value={locationAddress} onChange={(e) => setLocationAddress(e.target.value)} />
-      <TextField label="Map link" value={locationMapUrl} onChange={(e) => setLocationMapUrl(e.target.value)} placeholder="https://maps.google.com/…" />
+      <LocationPicker value={location} onChange={setLocation} />
+      <TextField
+        label="Map link"
+        value={location.locationMapUrl}
+        onChange={(e) => setLocation((prev) => ({ ...prev, locationMapUrl: e.target.value }))}
+        placeholder="https://maps.google.com/…"
+        hint="Auto-filled when you pick an address above; you can still edit or paste your own link."
+      />
       <TextAreaField
         label="Location notes"
         value={locationNotes}
