@@ -4,7 +4,7 @@ import { APIProvider, AdvancedMarker, Map } from "@vis.gl/react-google-maps";
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
-/** Read-only pin-on-a-map preview for a shoot's location, shown once it has coordinates. */
+/** Read-only pin-on-a-map preview for a shoot or meeting's location, shown once it has coordinates. */
 export function LocationMap({ lat, lng }: { lat: number; lng: number }) {
   if (!GOOGLE_MAPS_API_KEY) return null;
 

@@ -18,66 +18,65 @@ function appBaseUrl() {
 }
 
 async function loadInviteForEmail(inviteId: string) {
-  return prisma.shootInvite.findUniqueOrThrow({
+  return prisma.meetingInvite.findUniqueOrThrow({
     where: { id: inviteId },
     include: {
       membership: { include: { user: { select: { name: true, email: true } } } },
-      callTimeOverride: true,
-      shoot: { include: { days: { orderBy: [{ date: "asc" }, { halfDay: "asc" }] } } },
+      startTimeOverride: true,
+      meeting: { include: { days: { orderBy: [{ date: "asc" }, { halfDay: "asc" }] } } },
     },
   });
 }
 
 function icsDaysFor(
-  days: { id: string; date: Date; halfDay: "AM" | "PM"; defaultCallTime: string }[],
+  days: { id: string; date: Date; halfDay: "AM" | "PM"; defaultStartTime: string }[],
   overridesByDayId: Map<string, string>,
 ): IcsEventDay[] {
   return days.map((d) => ({
     id: d.id,
     dateIso: toIsoDate(d.date),
     halfDay: d.halfDay,
-    startTime: resolveEffectiveTime(d.defaultCallTime, overridesByDayId.get(d.id)),
+    startTime: resolveEffectiveTime(d.defaultStartTime, overridesByDayId.get(d.id)),
   }));
 }
 
 /**
- * Sends the shoot-invite email with a per-person .ics attachment reflecting
- * that person's actual call time (their override, or the day default) —
- * issue #10 acceptance criteria. No-login accept/decline links carry the
- * invite's token (spec §7).
+ * Sends the meeting-invite email with a per-person .ics attachment reflecting
+ * that person's actual start time (their override, or the day default).
+ * No-login accept/decline links carry the invite's token (spec §7).
  */
 export async function sendInviteEmail(inviteId: string) {
   const invite = await loadInviteForEmail(inviteId);
-  const shootTitle = invite.shoot.title ?? "your shoot";
-  const overridesByDayId = new Map(invite.callTimeOverride.map((o) => [o.shootDayId, o.callTime]));
+  const meetingTitle = invite.meeting.title ?? "your meeting";
+  const overridesByDayId = new Map(invite.startTimeOverride.map((o) => [o.meetingDayId, o.startTime]));
 
-  const days: InviteEmailDay[] = invite.shoot.days.map((d) => ({
+  const days: InviteEmailDay[] = invite.meeting.days.map((d) => ({
     dateLabel: toIsoDate(d.date),
     halfDayLabel: HALF_DAY_LABEL[d.halfDay],
-    time: resolveEffectiveTime(d.defaultCallTime, overridesByDayId.get(d.id)),
+    time: resolveEffectiveTime(d.defaultStartTime, overridesByDayId.get(d.id)),
   }));
 
   const ics = buildInviteIcs({
-    eventTitle: shootTitle,
-    filename: "shoot.ics",
-    locationAddress: invite.shoot.locationAddress,
-    locationLat: invite.shoot.locationLat,
-    locationLng: invite.shoot.locationLng,
-    locationMapUrl: invite.shoot.locationMapUrl,
-    locationNotes: invite.shoot.locationNotes,
-    icsUid: invite.shoot.icsUid,
-    icsSequence: invite.shoot.icsSequence,
-    days: icsDaysFor(invite.shoot.days, overridesByDayId),
+    eventTitle: meetingTitle,
+    filename: "meeting.ics",
+    locationAddress: invite.meeting.locationAddress,
+    locationLat: invite.meeting.locationLat,
+    locationLng: invite.meeting.locationLng,
+    locationMapUrl: invite.meeting.locationMapUrl,
+    locationNotes: invite.meeting.locationNotes,
+    icsUid: invite.meeting.icsUid,
+    icsSequence: invite.meeting.icsSequence,
+    days: icsDaysFor(invite.meeting.days, overridesByDayId),
   });
 
   const base = appBaseUrl();
   const { subject, html, text } = renderInviteEmail({
-    kind: "shoot",
+    kind: "meeting",
     recipientName: invite.membership.user.name,
-    eventTitle: shootTitle,
+    eventTitle: meetingTitle,
     days,
-    locationAddress: invite.shoot.locationAddress,
-    locationNotes: invite.shoot.locationNotes,
+    locationAddress: invite.meeting.locationAddress,
+    locationNotes: invite.meeting.locationNotes,
     acceptUrl: `${base}/invite/${invite.token}/accept`,
     declineUrl: `${base}/invite/${invite.token}/decline`,
   });
@@ -90,81 +89,81 @@ export async function sendInviteEmail(inviteId: string) {
     attachment: ics ? { filename: ics.filename, content: ics.content, contentType: "text/calendar" } : undefined,
   });
 
-  await prisma.shootInvite.update({ where: { id: inviteId }, data: { sentAt: new Date() } });
+  await prisma.meetingInvite.update({ where: { id: inviteId }, data: { sentAt: new Date() } });
 }
 
-/** Reminder for a still-pending invite — the nudge action (#9) and the automatic stale-invite cron (#10) both call this. */
+/** Reminder for a still-pending invite — the nudge action and the automatic stale-invite cron both call this. */
 export async function sendReminderEmail(inviteId: string) {
-  const invite = await prisma.shootInvite.findUniqueOrThrow({
+  const invite = await prisma.meetingInvite.findUniqueOrThrow({
     where: { id: inviteId },
-    include: { membership: { include: { user: { select: { name: true, email: true } } } }, shoot: true },
+    include: { membership: { include: { user: { select: { name: true, email: true } } } }, meeting: true },
   });
   if (!canNudgeInvite(invite.status)) return;
 
-  const shootTitle = invite.shoot.title ?? "your shoot";
+  const meetingTitle = invite.meeting.title ?? "your meeting";
   const { subject, html, text } = renderReminderEmail({
     recipientName: invite.membership.user.name,
-    eventTitle: shootTitle,
+    eventTitle: meetingTitle,
     viewUrl: `${appBaseUrl()}/invite/${invite.token}`,
   });
 
-  await prisma.shootInvite.update({ where: { id: inviteId }, data: { lastReminderSentAt: new Date() } });
+  await prisma.meetingInvite.update({ where: { id: inviteId }, data: { lastReminderSentAt: new Date() } });
   await sendTemplatedEmail({ to: invite.membership.user.email, subject, html, text });
 }
 
 /**
- * Any edit to a Confirmed shoot's time/location sends a fresh email + .ics
+ * Any edit to a Confirmed meeting's time/location sends a fresh email + .ics
  * with the same UID and an incremented SEQUENCE, so calendar apps treat it as
- * an update, never a silent dashboard-only change (issue #10 acceptance
- * criteria). Declined people and anyone removed from the roster are skipped —
- * they're not attending, so there's nothing to notify them about.
+ * an update, never a silent dashboard-only change. Declined people and anyone
+ * removed from the roster are skipped — they're not attending, so there's
+ * nothing to notify them about.
  */
-export async function notifyConfirmedShootChange(shootId: string, changes: ChangeField[]) {
+export async function notifyConfirmedMeetingChange(meetingId: string, changes: ChangeField[]) {
   if (changes.length === 0) return;
 
-  const shoot = await prisma.shoot.update({
-    where: { id: shootId },
+  const meeting = await prisma.meeting.update({
+    where: { id: meetingId },
     data: { icsSequence: { increment: 1 } },
     include: { days: { orderBy: [{ date: "asc" }, { halfDay: "asc" }] } },
   });
 
-  const activeSlots = await prisma.shootSlot.findMany({
-    where: { shootId, removedAt: null, membershipId: { not: null } },
+  const activeSlots = await prisma.meetingSlot.findMany({
+    where: { meetingId, removedAt: null, membershipId: { not: null } },
     select: { membershipId: true },
   });
   const activeMembershipIds = activeSlots.map((s) => s.membershipId!);
 
-  const invites = await prisma.shootInvite.findMany({
-    where: { shootId, membershipId: { in: activeMembershipIds }, status: { in: ["pending", "accepted"] } },
+  const invites = await prisma.meetingInvite.findMany({
+    where: { meetingId, membershipId: { in: activeMembershipIds }, status: { in: ["pending", "accepted"] } },
     include: {
       membership: { include: { user: { select: { name: true, email: true } } } },
-      callTimeOverride: true,
+      startTimeOverride: true,
     },
   });
 
-  const shootTitle = shoot.title ?? "the shoot";
+  const meetingTitle = meeting.title ?? "the meeting";
   const base = appBaseUrl();
 
   await Promise.all(
     invites.map(async (invite) => {
-      const overridesByDayId = new Map(invite.callTimeOverride.map((o) => [o.shootDayId, o.callTime]));
+      const overridesByDayId = new Map(invite.startTimeOverride.map((o) => [o.meetingDayId, o.startTime]));
       const ics = buildInviteIcs({
-        eventTitle: shootTitle,
-        filename: "shoot.ics",
-        locationAddress: shoot.locationAddress,
-        locationLat: shoot.locationLat,
-        locationLng: shoot.locationLng,
-        locationMapUrl: shoot.locationMapUrl,
-        locationNotes: shoot.locationNotes,
-        icsUid: shoot.icsUid,
-        icsSequence: shoot.icsSequence,
-        days: icsDaysFor(shoot.days, overridesByDayId),
+        eventTitle: meetingTitle,
+        filename: "meeting.ics",
+        locationAddress: meeting.locationAddress,
+        locationLat: meeting.locationLat,
+        locationLng: meeting.locationLng,
+        locationMapUrl: meeting.locationMapUrl,
+        locationNotes: meeting.locationNotes,
+        icsUid: meeting.icsUid,
+        icsSequence: meeting.icsSequence,
+        days: icsDaysFor(meeting.days, overridesByDayId),
       });
 
       const { subject, html, text } = renderChangeNotificationEmail({
-        kind: "shoot",
+        kind: "meeting",
         recipientName: invite.membership.user.name,
-        eventTitle: shootTitle,
+        eventTitle: meetingTitle,
         changes,
         viewUrl: `${base}/invite/${invite.token}`,
       });
@@ -181,36 +180,36 @@ export async function notifyConfirmedShootChange(shootId: string, changes: Chang
 }
 
 export type InviteLookup =
-  | { ok: true; shootTitle: string; status: "pending" | "accepted" | "declined"; recipientName: string }
+  | { ok: true; meetingTitle: string; status: "pending" | "accepted" | "declined"; recipientName: string }
   | { ok: false; reason: "not-found" | "expired" };
 
 export async function getInviteByToken(token: string): Promise<InviteLookup> {
-  const invite = await prisma.shootInvite.findUnique({
+  const invite = await prisma.meetingInvite.findUnique({
     where: { token },
-    include: { shoot: true, membership: { include: { user: { select: { name: true } } } } },
+    include: { meeting: true, membership: { include: { user: { select: { name: true } } } } },
   });
   if (!invite) return { ok: false, reason: "not-found" };
   if (isInviteTokenExpired(invite.createdAt, new Date())) return { ok: false, reason: "expired" };
 
   return {
     ok: true,
-    shootTitle: invite.shoot.title ?? "the shoot",
+    meetingTitle: invite.meeting.title ?? "the meeting",
     status: invite.status,
     recipientName: invite.membership.user.name,
   };
 }
 
 export type RespondResult =
-  | { ok: true; shootTitle: string; status: "accepted" | "declined" }
+  | { ok: true; meetingTitle: string; status: "accepted" | "declined" }
   | { ok: false; reason: "not-found" | "expired" };
 
-/** Accept/Decline with zero login, via the invite's token (spec §7, issue #10 acceptance criteria). */
+/** Accept/Decline with zero login, via the invite's token (spec §7). */
 export async function respondToInvite(token: string, response: "accepted" | "declined"): Promise<RespondResult> {
-  const invite = await prisma.shootInvite.findUnique({ where: { token }, include: { shoot: true } });
+  const invite = await prisma.meetingInvite.findUnique({ where: { token }, include: { meeting: true } });
   if (!invite) return { ok: false, reason: "not-found" };
   if (isInviteTokenExpired(invite.createdAt, new Date())) return { ok: false, reason: "expired" };
 
-  await prisma.shootInvite.update({
+  await prisma.meetingInvite.update({
     where: { id: invite.id },
     data: {
       status: response,
@@ -221,5 +220,5 @@ export async function respondToInvite(token: string, response: "accepted" | "dec
     },
   });
 
-  return { ok: true, shootTitle: invite.shoot.title ?? "the shoot", status: response };
+  return { ok: true, meetingTitle: invite.meeting.title ?? "the meeting", status: response };
 }

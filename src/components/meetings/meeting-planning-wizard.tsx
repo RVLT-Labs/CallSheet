@@ -9,7 +9,7 @@ import { PillRow } from "@/components/ui/pill-row";
 import { StatusDot } from "@/components/ui/status-dot";
 import { TextField } from "@/components/ui/text-field";
 import { TIER_LABEL, type Tier } from "@/lib/availability-tiers";
-import { confirmShoot, suggestDates } from "@/app/shoots/new/actions";
+import { confirmMeeting, suggestDates } from "@/app/meetings/new/actions";
 import type { HalfDayPreference, RankedCandidate } from "@/server/scheduling-suggestions";
 
 type Step = 1 | 2 | 3 | 4;
@@ -42,7 +42,7 @@ const TIER_TONE: Record<Tier, "forest" | "terracotta" | "burgundy"> = {
   unavailable: "burgundy",
 };
 
-export function ShootPlanningWizard({
+export function MeetingPlanningWizard({
   crew,
   windowStart,
   windowEnd,
@@ -66,7 +66,7 @@ export function ShootPlanningWizard({
   const [halfDayPreference, setHalfDayPreference] = useState<HalfDayPreference>("EITHER");
   const [searchStart, setSearchStart] = useState(windowStart);
   const [searchEnd, setSearchEnd] = useState(windowEnd);
-  const [defaultCallTime, setDefaultCallTime] = useState("08:00");
+  const [defaultStartTime, setDefaultStartTime] = useState("08:00");
 
   const [candidates, setCandidates] = useState<RankedCandidate[] | null>(null);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
@@ -124,17 +124,17 @@ export function ShootPlanningWizard({
     setConfirming(true);
     setConfirmError(null);
     try {
-      await confirmShoot({
+      await confirmMeeting({
         status,
         dayIsos: candidate.dayIsos,
         halfDayPreference,
-        defaultCallTime,
+        defaultStartTime,
         required: { membershipIds: requiredMembershipIds, placeholderLabels: requiredPlaceholders },
         general: { membershipIds: generalMembershipIds, placeholderLabels: generalPlaceholders },
       });
     } catch (e) {
       // redirect() throws internally on success — only a real error lands here.
-      setConfirmError(e instanceof Error ? e.message : "Could not create the shoot.");
+      setConfirmError(e instanceof Error ? e.message : "Could not create the meeting.");
       setConfirming(false);
     }
   }
@@ -203,7 +203,7 @@ export function ShootPlanningWizard({
                 addPlaceholder();
               }
             }}
-            placeholder="e.g. TBD Boom Op"
+            placeholder="e.g. TBD Producer"
             className="flex-1 border-0 border-b-[1.5px] border-hairline bg-transparent py-2 text-[13px] placeholder:text-ink-faint focus:border-burgundy focus:outline-none"
           />
           <button
@@ -233,7 +233,7 @@ export function ShootPlanningWizard({
         <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Length</p>
         <div className="mb-5 flex items-center gap-3">
           <PillRow
-            aria-label="Shoot length"
+            aria-label="Meeting length"
             value={dayMode}
             onChange={setDayMode}
             options={[
@@ -287,10 +287,10 @@ export function ShootPlanningWizard({
         </div>
 
         <TextField
-          label="Default call time"
+          label="Default start time"
           type="time"
-          value={defaultCallTime}
-          onChange={(e) => setDefaultCallTime(e.target.value)}
+          value={defaultStartTime}
+          onChange={(e) => setDefaultStartTime(e.target.value)}
         />
 
         {suggestError && <p className="mb-3 text-[12.5px] text-burgundy">{suggestError}</p>}
@@ -402,7 +402,7 @@ export function ShootPlanningWizard({
           </p>
           <p className="text-[12px] text-ink-soft">
             {halfDayPreference === "EITHER" ? "Full day" : halfDayPreference === "AM" ? "Morning" : "Afternoon"} ·
-            Call {defaultCallTime}
+            Start {defaultStartTime}
           </p>
           <p className="mt-2 text-[12px] text-ink-soft">
             {requiredMembershipIds.length + requiredPlaceholders.length} required ·{" "}
@@ -423,7 +423,7 @@ export function ShootPlanningWizard({
           {confirming ? "Saving…" : "Save as Tentative"}
         </Button>
         <Button variant="primary" disabled={confirming} onClick={() => handleConfirm("confirmed")} className="flex-1">
-          {confirming ? "Saving…" : "Confirm shoot"}
+          {confirming ? "Saving…" : "Confirm meeting"}
         </Button>
       </div>
     </div>

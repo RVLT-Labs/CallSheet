@@ -42,6 +42,17 @@ export function ClapperboardIcon(props: IconProps) {
   );
 }
 
+export function UsersIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="9" cy="8.5" r="3" />
+      <path d="M3.5 19.5c0-3.04 2.46-5.5 5.5-5.5s5.5 2.46 5.5 5.5" />
+      <path d="M15.5 6.2c1.4.5 2.4 1.84 2.4 3.4 0 1.56-1 2.9-2.4 3.4" />
+      <path d="M15 14.2c2.53.5 4.5 2.4 4.5 5.3" />
+    </svg>
+  );
+}
+
 export function EnvelopeIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>

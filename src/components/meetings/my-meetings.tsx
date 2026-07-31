@@ -3,7 +3,7 @@
 import { useOptimistic, useState, useTransition } from "react";
 import Link from "next/link";
 
-import { acceptAllInvitesAction, respondToInviteAction } from "@/app/shoots/actions";
+import { acceptAllInvitesAction, respondToInviteAction } from "@/app/meetings/actions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ChevronRightIcon } from "@/components/ui/icons";
@@ -12,8 +12,9 @@ import { PageShell } from "@/components/ui/page-shell";
 import { Sheet } from "@/components/ui/sheet";
 import { StatusDot } from "@/components/ui/status-dot";
 import { StickyFooterAction } from "@/components/ui/sticky-footer-action";
-import { NOTHING_SCHEDULED_COPY, needsStickyAcceptAllFooter, splitSoonestPending } from "@/lib/my-shoots-rules";
-import type { MyShoot } from "@/server/my-shoots";
+import { NOTHING_SCHEDULED_COPY } from "@/lib/my-meetings-rules";
+import { needsStickyAcceptAllFooter, splitSoonestPending } from "@/lib/my-shoots-rules";
+import type { MyMeeting } from "@/server/my-meetings";
 import { inviteStatusLabel } from "@/server/invite-roster";
 
 const INVITE_TONE = { accepted: "forest", declined: "burgundy", pending: "taupe" } as const;
@@ -25,19 +26,19 @@ function dateLabel(dateIsos: string[]) {
 }
 
 function applyInviteResponse(
-  state: MyShoot[],
+  state: MyMeeting[],
   update: { inviteIds: string[]; status: "accepted" | "declined" },
-): MyShoot[] {
-  return state.map((s) =>
-    s.inviteId && update.inviteIds.includes(s.inviteId)
-      ? { ...s, inviteStatus: update.status, inviteResponseSource: "crew" }
-      : s,
+): MyMeeting[] {
+  return state.map((m) =>
+    m.inviteId && update.inviteIds.includes(m.inviteId)
+      ? { ...m, inviteStatus: update.status, inviteResponseSource: "crew" }
+      : m,
   );
 }
 
-export function MyShoots({ upcoming, past }: { upcoming: MyShoot[]; past: MyShoot[] }) {
+export function MyMeetings({ upcoming, past }: { upcoming: MyMeeting[]; past: MyMeeting[] }) {
   const [optimisticUpcoming, applyOptimisticResponse] = useOptimistic(upcoming, applyInviteResponse);
-  const pending = optimisticUpcoming.filter((s) => s.inviteStatus === "pending");
+  const pending = optimisticUpcoming.filter((m) => m.inviteStatus === "pending");
   const { soonest, rest } = splitSoonestPending(pending);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [pastOpen, setPastOpen] = useState(false);
@@ -56,7 +57,7 @@ export function MyShoots({ upcoming, past }: { upcoming: MyShoot[]; past: MyShoo
   }
 
   function acceptAll() {
-    const ids = pending.map((s) => s.inviteId).filter((id): id is string => Boolean(id));
+    const ids = pending.map((m) => m.inviteId).filter((id): id is string => Boolean(id));
     setSheetOpen(false);
     startTransition(async () => {
       applyOptimisticResponse({ inviteIds: ids, status: "accepted" });
@@ -70,13 +71,13 @@ export function MyShoots({ upcoming, past }: { upcoming: MyShoot[]; past: MyShoo
 
   return (
     <PageShell maxWidth="max-w-6xl">
-      <h1 className="font-display mb-6 text-2xl font-bold italic text-burgundy md:text-3xl">My Shoots</h1>
+      <h1 className="font-display mb-6 text-2xl font-bold italic text-burgundy md:text-3xl">My Meetings</h1>
 
       {soonest && (
         <div className="md:max-w-md">
         <Card>
           <p className="mb-1 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Needs your response</p>
-          <p className="mb-1 text-[15px] font-semibold">{soonest.title ?? "Shoot"}</p>
+          <p className="mb-1 text-[15px] font-semibold">{soonest.title ?? "Meeting"}</p>
           <p className="mb-4 text-[13px] text-ink-soft">{dateLabel(soonest.dateIsos)}</p>
           <div className="flex gap-3">
             <Button
@@ -113,17 +114,17 @@ export function MyShoots({ upcoming, past }: { upcoming: MyShoot[]; past: MyShoo
 
       <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Needs your response">
         <div className="max-h-[60vh] overflow-y-auto">
-          {rest.map((shoot) => (
-            <div key={shoot.id} className="flex items-center justify-between border-b border-hairline py-3 last:border-b-0">
+          {rest.map((meeting) => (
+            <div key={meeting.id} className="flex items-center justify-between border-b border-hairline py-3 last:border-b-0">
               <div>
-                <p className="text-[13.5px] font-medium">{shoot.title ?? "Shoot"}</p>
-                <p className="text-[12px] text-ink-soft">{dateLabel(shoot.dateIsos)}</p>
+                <p className="text-[13.5px] font-medium">{meeting.title ?? "Meeting"}</p>
+                <p className="text-[12px] text-ink-soft">{dateLabel(meeting.dateIsos)}</p>
               </div>
               <div className="flex gap-2">
                 <button
                   type="button"
                   disabled={isSaving}
-                  onClick={() => shoot.inviteId && respond(shoot.inviteId, "accepted")}
+                  onClick={() => meeting.inviteId && respond(meeting.inviteId, "accepted")}
                   className="text-[12px] font-semibold text-forest"
                 >
                   Accept
@@ -131,7 +132,7 @@ export function MyShoots({ upcoming, past }: { upcoming: MyShoot[]; past: MyShoo
                 <button
                   type="button"
                   disabled={isSaving}
-                  onClick={() => shoot.inviteId && respond(shoot.inviteId, "declined")}
+                  onClick={() => meeting.inviteId && respond(meeting.inviteId, "declined")}
                   className="text-[12px] font-semibold text-burgundy"
                 >
                   Decline
@@ -153,22 +154,22 @@ export function MyShoots({ upcoming, past }: { upcoming: MyShoot[]; past: MyShoo
         <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Upcoming</p>
         {optimisticUpcoming.length === 0 && <p className="text-[13px] text-ink-soft">{NOTHING_SCHEDULED_COPY}</p>}
         <div className="md:grid md:grid-cols-2 md:gap-x-10">
-          {optimisticUpcoming.map((shoot) => (
+          {optimisticUpcoming.map((meeting) => (
             <Link
-              key={shoot.id}
-              href={`/shoots/${shoot.id}`}
+              key={meeting.id}
+              href={`/meetings/${meeting.id}`}
               className="flex items-center justify-between border-b border-hairline py-3 text-left last:border-b-0"
             >
               <div>
-                <p className="text-[13.5px] font-medium">{shoot.title ?? "Shoot"}</p>
-                <p className="text-[12px] text-ink-soft">{dateLabel(shoot.dateIsos)}</p>
+                <p className="text-[13.5px] font-medium">{meeting.title ?? "Meeting"}</p>
+                <p className="text-[12px] text-ink-soft">{dateLabel(meeting.dateIsos)}</p>
               </div>
-              {shoot.status === "tentative" ? (
+              {meeting.status === "tentative" ? (
                 <span className="text-[12px] italic text-terracotta">Hold, not booked</span>
-              ) : shoot.inviteStatus ? (
+              ) : meeting.inviteStatus ? (
                 <StatusDot
-                  tone={INVITE_TONE[shoot.inviteStatus]}
-                  label={inviteStatusLabel(shoot.inviteStatus, shoot.inviteResponseSource ?? "crew")}
+                  tone={INVITE_TONE[meeting.inviteStatus]}
+                  label={inviteStatusLabel(meeting.inviteStatus, meeting.inviteResponseSource ?? "crew")}
                 />
               ) : null}
             </Link>
@@ -187,11 +188,11 @@ export function MyShoots({ upcoming, past }: { upcoming: MyShoot[]; past: MyShoo
           </button>
           {pastOpen && (
             <div className="md:grid md:grid-cols-2 md:gap-x-10">
-              {past.map((shoot) => (
-                <div key={shoot.id} className="flex items-center justify-between border-b border-hairline py-3 text-ink-faint">
+              {past.map((meeting) => (
+                <div key={meeting.id} className="flex items-center justify-between border-b border-hairline py-3 text-ink-faint">
                   <div>
-                    <p className="text-[13.5px]">{shoot.title ?? "Shoot"}</p>
-                    <p className="text-[12px]">{dateLabel(shoot.dateIsos)}</p>
+                    <p className="text-[13.5px]">{meeting.title ?? "Meeting"}</p>
+                    <p className="text-[12px]">{dateLabel(meeting.dateIsos)}</p>
                   </div>
                 </div>
               ))}

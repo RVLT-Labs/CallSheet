@@ -16,12 +16,12 @@ import { LocationMap } from "@/components/location/location-map";
 import { LocationPicker, type LocationFields } from "@/components/location/location-picker";
 
 import {
-  confirmShootAction,
-  updateShootDetailsAction,
-} from "@/app/shoots/[id]/actions";
-import { PersonSheet } from "@/components/shoots/person-sheet";
+  confirmMeetingAction,
+  updateMeetingDetailsAction,
+} from "@/app/meetings/[id]/actions";
+import { PersonSheet } from "@/components/meetings/person-sheet";
 
-export type ShootDetailData = {
+export type MeetingDetailData = {
   id: string;
   status: "tentative" | "confirmed";
   title: string | null;
@@ -32,7 +32,7 @@ export type ShootDetailData = {
   locationMapUrl: string | null;
   locationNotes: string | null;
   dayIsos: string[];
-  days: { id: string; dateIso: string; halfDay: "AM" | "PM"; defaultCallTime: string }[];
+  days: { id: string; dateIso: string; halfDay: "AM" | "PM"; defaultStartTime: string }[];
   activeSlots: {
     id: string;
     kind: "required" | "general";
@@ -48,7 +48,7 @@ export type ShootDetailData = {
     status: InviteStatus;
     responseSource: InviteResponseSource;
     lastReminderSentAt: string | null;
-    overrides: { shootDayId: string; callTime: string }[];
+    overrides: { meetingDayId: string; startTime: string }[];
   }[];
   tentativeRatio: { availableCount: number; totalCount: number } | null;
 };
@@ -65,16 +65,16 @@ function dateRangeLabel(dayIsos: string[]) {
   return `${dayIsos[0]} – ${dayIsos[dayIsos.length - 1]}`;
 }
 
-export function ShootDetailView({ shoot, isOrganiser }: { shoot: ShootDetailData; isOrganiser: boolean }) {
+export function MeetingDetailView({ meeting, isOrganiser }: { meeting: MeetingDetailData; isOrganiser: boolean }) {
   const [editOpen, setEditOpen] = useState(false);
   const [activeMembershipId, setActiveMembershipId] = useState<string | null>(null);
   const [confirming, startConfirmTransition] = useTransition();
 
-  const invitesByMembership = new Map(shoot.invites.map((inv) => [inv.membershipId, inv]));
-  const rsvpCounts = countRsvpStatuses(shoot.invites);
-  const where = shoot.locationAddress ?? "No location set yet";
+  const invitesByMembership = new Map(meeting.invites.map((inv) => [inv.membershipId, inv]));
+  const rsvpCounts = countRsvpStatuses(meeting.invites);
+  const where = meeting.locationAddress ?? "No location set yet";
 
-  const activePerson = shoot.activeSlots.find((s) => s.membershipId === activeMembershipId);
+  const activePerson = meeting.activeSlots.find((s) => s.membershipId === activeMembershipId);
   const activeInvite = activeMembershipId ? invitesByMembership.get(activeMembershipId) : undefined;
 
   return (
@@ -82,8 +82,8 @@ export function ShootDetailView({ shoot, isOrganiser }: { shoot: ShootDetailData
       <div className="mb-6">
         <div className="mb-1.5 flex items-center justify-between">
           <StatusDot
-            tone={shoot.status === "confirmed" ? "forest" : "terracotta"}
-            label={shoot.status === "confirmed" ? "Confirmed" : "Tentative"}
+            tone={meeting.status === "confirmed" ? "forest" : "terracotta"}
+            label={meeting.status === "confirmed" ? "Confirmed" : "Tentative"}
           />
           {isOrganiser && (
             <button type="button" onClick={() => setEditOpen(true)} className="text-[12px] font-semibold text-burgundy">
@@ -91,31 +91,31 @@ export function ShootDetailView({ shoot, isOrganiser }: { shoot: ShootDetailData
             </button>
           )}
         </div>
-        <h1 className="font-display mb-1 text-2xl font-bold italic text-burgundy md:text-3xl">{shoot.title ?? "Shoot"}</h1>
-        <p className="text-[13px] text-ink-soft">{dateRangeLabel(shoot.dayIsos)}</p>
+        <h1 className="font-display mb-1 text-2xl font-bold italic text-burgundy md:text-3xl">{meeting.title ?? "Meeting"}</h1>
+        <p className="text-[13px] text-ink-soft">{dateRangeLabel(meeting.dayIsos)}</p>
       </div>
 
       <div className="lg:grid lg:grid-cols-[1fr_280px] lg:items-start lg:gap-10">
         <div>
-          {shoot.status === "tentative" && (
+          {meeting.status === "tentative" && (
             <div className="mb-6">
               <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Availability</p>
-              {shoot.tentativeRatio && shoot.tentativeRatio.totalCount > 0 ? (
+              {meeting.tentativeRatio && meeting.tentativeRatio.totalCount > 0 ? (
                 <ProportionBar
                   segments={[
-                    { tone: "forest", label: "Available", count: shoot.tentativeRatio.availableCount },
+                    { tone: "forest", label: "Available", count: meeting.tentativeRatio.availableCount },
                     {
                       tone: "ink-faint",
                       label: "Not yet",
-                      count: shoot.tentativeRatio.totalCount - shoot.tentativeRatio.availableCount,
+                      count: meeting.tentativeRatio.totalCount - meeting.tentativeRatio.availableCount,
                     },
                   ]}
                 />
               ) : (
-                <p className="text-[13px] text-ink-soft">No crew added to this shoot yet.</p>
+                <p className="text-[13px] text-ink-soft">No crew added to this meeting yet.</p>
               )}
               <p className="mt-3 text-[11.5px] italic text-ink-faint">
-                No invites have gone out yet. Confirming this shoot sends them and opens the RSVP roster.
+                No invites have gone out yet. Confirming this meeting sends them and opens the RSVP roster.
               </p>
 
               {isOrganiser && (
@@ -124,18 +124,18 @@ export function ShootDetailView({ shoot, isOrganiser }: { shoot: ShootDetailData
                   disabled={confirming}
                   onClick={() =>
                     startConfirmTransition(async () => {
-                      await confirmShootAction(shoot.id);
+                      await confirmMeetingAction(meeting.id);
                     })
                   }
                   className="mt-4"
                 >
-                  {confirming ? "Confirming…" : "Confirm shoot"}
+                  {confirming ? "Confirming…" : "Confirm meeting"}
                 </Button>
               )}
             </div>
           )}
 
-          {shoot.status === "confirmed" && (
+          {meeting.status === "confirmed" && (
             <div className="mb-6">
               <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">RSVPs</p>
               <ProportionBar
@@ -147,7 +147,7 @@ export function ShootDetailView({ shoot, isOrganiser }: { shoot: ShootDetailData
               />
 
               <div className="mt-4">
-                {shoot.activeSlots.map((slot) => {
+                {meeting.activeSlots.map((slot) => {
                   const invite = slot.membershipId ? invitesByMembership.get(slot.membershipId) : undefined;
                   return (
                     <button
@@ -177,12 +177,12 @@ export function ShootDetailView({ shoot, isOrganiser }: { shoot: ShootDetailData
                 })}
               </div>
 
-              {shoot.removedSlots.length > 0 && (
+              {meeting.removedSlots.length > 0 && (
                 <div className="mt-4">
                   <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-ink-faint">
                     Removed (RSVP kept)
                   </p>
-                  {shoot.removedSlots.map((slot) => (
+                  {meeting.removedSlots.map((slot) => (
                     <p key={slot.id} className="py-1 text-[12.5px] text-ink-faint line-through">
                       {slot.memberName}
                     </p>
@@ -196,9 +196,9 @@ export function ShootDetailView({ shoot, isOrganiser }: { shoot: ShootDetailData
         <div className="mt-2 rounded-md border border-hairline bg-white p-4 lg:mt-0">
           <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Location</p>
           <p className="text-[13px] text-ink-soft">{where}</p>
-          {shoot.locationMapUrl && (
+          {meeting.locationMapUrl && (
             <a
-              href={shoot.locationMapUrl}
+              href={meeting.locationMapUrl}
               target="_blank"
               rel="noreferrer"
               className="mt-1 inline-block text-[12px] font-semibold text-burgundy"
@@ -206,23 +206,23 @@ export function ShootDetailView({ shoot, isOrganiser }: { shoot: ShootDetailData
               Open map
             </a>
           )}
-          {shoot.locationLat != null && shoot.locationLng != null && (
-            <LocationMap lat={shoot.locationLat} lng={shoot.locationLng} />
+          {meeting.locationLat != null && meeting.locationLng != null && (
+            <LocationMap lat={meeting.locationLat} lng={meeting.locationLng} />
           )}
-          {shoot.locationNotes && <p className="mt-2 text-[12px] text-ink-soft">{shoot.locationNotes}</p>}
+          {meeting.locationNotes && <p className="mt-2 text-[12px] text-ink-soft">{meeting.locationNotes}</p>}
         </div>
       </div>
 
-      <Sheet open={editOpen} onClose={() => setEditOpen(false)} title="Edit shoot details">
-        <EditDetailsForm shoot={shoot} onSaved={() => setEditOpen(false)} />
+      <Sheet open={editOpen} onClose={() => setEditOpen(false)} title="Edit meeting details">
+        <EditDetailsForm meeting={meeting} onSaved={() => setEditOpen(false)} />
       </Sheet>
 
       {activePerson && activeMembershipId && (
         <PersonSheet
-          shootId={shoot.id}
+          meetingId={meeting.id}
           memberName={activePerson.memberName ?? "Unknown"}
           invite={activeInvite ?? null}
-          days={shoot.days}
+          days={meeting.days}
           isOrganiser={isOrganiser}
           onClose={() => setActiveMembershipId(null)}
         />
@@ -231,28 +231,28 @@ export function ShootDetailView({ shoot, isOrganiser }: { shoot: ShootDetailData
   );
 }
 
-function EditDetailsForm({ shoot, onSaved }: { shoot: ShootDetailData; onSaved: () => void }) {
-  const [title, setTitle] = useState(shoot.title ?? "");
+function EditDetailsForm({ meeting, onSaved }: { meeting: MeetingDetailData; onSaved: () => void }) {
+  const [title, setTitle] = useState(meeting.title ?? "");
   const [location, setLocation] = useState<LocationFields>({
-    locationAddress: shoot.locationAddress ?? "",
-    locationMapUrl: shoot.locationMapUrl ?? "",
-    locationPlaceId: shoot.locationPlaceId,
-    locationLat: shoot.locationLat,
-    locationLng: shoot.locationLng,
+    locationAddress: meeting.locationAddress ?? "",
+    locationMapUrl: meeting.locationMapUrl ?? "",
+    locationPlaceId: meeting.locationPlaceId,
+    locationLat: meeting.locationLat,
+    locationLng: meeting.locationLng,
   });
-  const [locationNotes, setLocationNotes] = useState(shoot.locationNotes ?? "");
-  const [callTimes, setCallTimes] = useState<Record<string, string>>(
-    Object.fromEntries(shoot.days.map((d) => [d.id, d.defaultCallTime])),
+  const [locationNotes, setLocationNotes] = useState(meeting.locationNotes ?? "");
+  const [startTimes, setStartTimes] = useState<Record<string, string>>(
+    Object.fromEntries(meeting.days.map((d) => [d.id, d.defaultStartTime])),
   );
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
     setSaving(true);
-    await updateShootDetailsAction(shoot.id, {
+    await updateMeetingDetailsAction(meeting.id, {
       title,
       ...location,
       locationNotes,
-      dayCallTimes: shoot.days.map((d) => ({ dayId: d.id, defaultCallTime: callTimes[d.id] ?? d.defaultCallTime })),
+      dayStartTimes: meeting.days.map((d) => ({ dayId: d.id, defaultStartTime: startTimes[d.id] ?? d.defaultStartTime })),
     });
     setSaving(false);
     onSaved();
@@ -260,7 +260,7 @@ function EditDetailsForm({ shoot, onSaved }: { shoot: ShootDetailData; onSaved: 
 
   return (
     <div>
-      <TextField label="Title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Rooftop chase scene" />
+      <TextField label="Title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Production meeting" />
       <LocationPicker value={location} onChange={setLocation} />
       <TextField
         label="Map link"
@@ -273,28 +273,28 @@ function EditDetailsForm({ shoot, onSaved }: { shoot: ShootDetailData; onSaved: 
         label="Location notes"
         value={locationNotes}
         onChange={(e) => setLocationNotes(e.target.value)}
-        placeholder="Parking, nearest hospital, load-in instructions…"
+        placeholder="Parking, entrance, room number…"
       />
 
-      {shoot.days.length > 0 && (
+      {meeting.days.length > 0 && (
         <div className="mb-[18px]">
-          <p className="mb-1.5 block text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Default call time</p>
-          {shoot.days.map((day) => (
+          <p className="mb-1.5 block text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Default start time</p>
+          {meeting.days.map((day) => (
             <div key={day.id} className="mb-2 flex items-center justify-between gap-3">
               <span className="text-[12.5px] text-ink-soft">
                 {day.dateIso} · {HALF_DAY_LABEL[day.halfDay]}
               </span>
               <input
                 type="time"
-                value={callTimes[day.id] ?? day.defaultCallTime}
-                onChange={(e) => setCallTimes((prev) => ({ ...prev, [day.id]: e.target.value }))}
+                value={startTimes[day.id] ?? day.defaultStartTime}
+                onChange={(e) => setStartTimes((prev) => ({ ...prev, [day.id]: e.target.value }))}
                 className="rounded-md border border-hairline bg-white px-2 py-1 text-[12.5px]"
               />
             </div>
           ))}
-          {shoot.status === "confirmed" && (
+          {meeting.status === "confirmed" && (
             <p className="text-[11px] italic text-ink-faint">
-              Changing the call time or location here emails everyone still invited, with an updated calendar invite.
+              Changing the start time or location here emails everyone still invited, with an updated calendar invite.
             </p>
           )}
         </div>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { combineDayTier, rankCandidates, type CandidateInput, type PersonAvailability } from "@/server/shoot-suggestions";
+import { combineDayTier, rankCandidates, type CandidateInput, type PersonAvailability } from "@/server/scheduling-suggestions";
 import { utcDate } from "@/server/availability-rules";
 
 function availability(entries: Record<string, { am?: string; pm?: string }>): PersonAvailability {

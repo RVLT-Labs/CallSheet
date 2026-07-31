@@ -12,8 +12,8 @@ import {
   nudgeInviteAction,
   overrideInviteStatusAction,
   removePersonAction,
-  setCallTimeOverrideAction,
-} from "@/app/shoots/[id]/actions";
+  setStartTimeOverrideAction,
+} from "@/app/meetings/[id]/actions";
 
 const INVITE_TONE: Record<InviteStatus, "forest" | "burgundy" | "taupe"> = {
   accepted: "forest",
@@ -28,7 +28,7 @@ const STATUS_OPTIONS: { status: InviteStatus; label: string }[] = [
 ];
 
 type PersonSheetProps = {
-  shootId: string;
+  meetingId: string;
   memberName: string;
   invite: {
     id: string;
@@ -36,16 +36,16 @@ type PersonSheetProps = {
     status: InviteStatus;
     responseSource: InviteResponseSource;
     lastReminderSentAt: string | null;
-    overrides: { shootDayId: string; callTime: string }[];
+    overrides: { meetingDayId: string; startTime: string }[];
   } | null;
-  days: { id: string; dateIso: string; halfDay: "AM" | "PM"; defaultCallTime: string }[];
+  days: { id: string; dateIso: string; halfDay: "AM" | "PM"; defaultStartTime: string }[];
   isOrganiser: boolean;
   onClose: () => void;
 };
 
-export function PersonSheet({ shootId, memberName, invite, days, isOrganiser, onClose }: PersonSheetProps) {
+export function PersonSheet({ meetingId, memberName, invite, days, isOrganiser, onClose }: PersonSheetProps) {
   const [pending, startTransition] = useTransition();
-  const overrideByDay = new Map(invite?.overrides.map((o) => [o.shootDayId, o.callTime]));
+  const overrideByDay = new Map(invite?.overrides.map((o) => [o.meetingDayId, o.startTime]));
   const [drafts, setDrafts] = useState<Record<string, string>>(
     Object.fromEntries(days.map((d) => [d.id, overrideByDay.get(d.id) ?? ""])),
   );
@@ -53,7 +53,7 @@ export function PersonSheet({ shootId, memberName, invite, days, isOrganiser, on
   function saveOverride(dayId: string) {
     if (!invite) return;
     startTransition(async () => {
-      await setCallTimeOverrideAction(shootId, invite.id, dayId, drafts[dayId] ?? "");
+      await setStartTimeOverrideAction(meetingId, invite.id, dayId, drafts[dayId] ?? "");
     });
   }
 
@@ -75,7 +75,7 @@ export function PersonSheet({ shootId, memberName, invite, days, isOrganiser, on
                 type="button"
                 disabled={pending || invite.status === option.status}
                 onClick={() =>
-                  startTransition(() => overrideInviteStatusAction(shootId, invite.id, option.status))
+                  startTransition(() => overrideInviteStatusAction(meetingId, invite.id, option.status))
                 }
                 className="flex-1 rounded-md border border-hairline px-2 py-1.5 text-[12px] font-semibold text-ink-soft disabled:border-burgundy disabled:text-burgundy"
               >
@@ -90,7 +90,7 @@ export function PersonSheet({ shootId, memberName, invite, days, isOrganiser, on
         </div>
       )}
 
-      <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Call time</p>
+      <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Start time</p>
       {days.map((day) => (
         <div key={day.id} className="mb-3 flex items-center justify-between gap-3">
           <span className="text-[12.5px] text-ink-soft">
@@ -100,18 +100,18 @@ export function PersonSheet({ shootId, memberName, invite, days, isOrganiser, on
             <input
               type="time"
               value={drafts[day.id] ?? ""}
-              placeholder={day.defaultCallTime}
+              placeholder={day.defaultStartTime}
               onChange={(e) => setDrafts((prev) => ({ ...prev, [day.id]: e.target.value }))}
               onBlur={() => saveOverride(day.id)}
               className="rounded-md border border-hairline bg-white px-2 py-1 text-[12.5px]"
             />
           ) : (
-            <span className="font-mono text-[12.5px]">{drafts[day.id] || day.defaultCallTime}</span>
+            <span className="font-mono text-[12.5px]">{drafts[day.id] || day.defaultStartTime}</span>
           )}
         </div>
       ))}
       <p className="mb-4 text-[11px] italic text-ink-faint">
-        Leave blank to use the day&apos;s default call time.
+        Leave blank to use the day&apos;s default start time.
       </p>
 
       {isOrganiser && invite && (
@@ -119,7 +119,7 @@ export function PersonSheet({ shootId, memberName, invite, days, isOrganiser, on
           <Button
             variant="secondary"
             disabled={pending || !canNudgeInvite(invite.status)}
-            onClick={() => startTransition(() => nudgeInviteAction(shootId, invite.id))}
+            onClick={() => startTransition(() => nudgeInviteAction(meetingId, invite.id))}
             className="flex-1"
           >
             Nudge
@@ -128,9 +128,9 @@ export function PersonSheet({ shootId, memberName, invite, days, isOrganiser, on
             variant="secondary"
             disabled={pending}
             onClick={() => {
-              if (!confirm(`Remove ${memberName} from this shoot?`)) return;
+              if (!confirm(`Remove ${memberName} from this meeting?`)) return;
               startTransition(async () => {
-                await removePersonAction(shootId, invite.membershipId);
+                await removePersonAction(meetingId, invite.membershipId);
                 onClose();
               });
             }}

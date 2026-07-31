@@ -7,19 +7,19 @@ import {
   inviteStatusLabel,
   isInviteDueForReminder,
   removalOutcomeForInvite,
-  resolveEffectiveCallTime,
-  shouldNotifyShootChange,
-} from "@/server/shoot-roster";
+  resolveEffectiveTime,
+  shouldNotifyConfirmedEventChange,
+} from "@/server/invite-roster";
 
-describe("resolveEffectiveCallTime", () => {
+describe("resolveEffectiveTime", () => {
   it("falls back to the day's default when there is no override", () => {
-    expect(resolveEffectiveCallTime("08:00", null)).toBe("08:00");
-    expect(resolveEffectiveCallTime("08:00", undefined)).toBe("08:00");
-    expect(resolveEffectiveCallTime("08:00", "")).toBe("08:00");
+    expect(resolveEffectiveTime("08:00", null)).toBe("08:00");
+    expect(resolveEffectiveTime("08:00", undefined)).toBe("08:00");
+    expect(resolveEffectiveTime("08:00", "")).toBe("08:00");
   });
 
   it("uses the override when set", () => {
-    expect(resolveEffectiveCallTime("08:00", "06:30")).toBe("06:30");
+    expect(resolveEffectiveTime("08:00", "06:30")).toBe("06:30");
   });
 });
 
@@ -74,16 +74,16 @@ describe("inviteStatusLabel", () => {
   });
 });
 
-describe("shouldNotifyShootChange", () => {
+describe("shouldNotifyConfirmedEventChange", () => {
   it("never notifies for a Tentative shoot, since it has no invites yet", () => {
-    expect(shouldNotifyShootChange("tentative", 1)).toBe(false);
-    expect(shouldNotifyShootChange("tentative", 0)).toBe(false);
+    expect(shouldNotifyConfirmedEventChange("tentative", 1)).toBe(false);
+    expect(shouldNotifyConfirmedEventChange("tentative", 0)).toBe(false);
   });
 
   it("notifies for a Confirmed shoot only when something actually changed", () => {
-    expect(shouldNotifyShootChange("confirmed", 0)).toBe(false);
-    expect(shouldNotifyShootChange("confirmed", 1)).toBe(true);
-    expect(shouldNotifyShootChange("confirmed", 2)).toBe(true);
+    expect(shouldNotifyConfirmedEventChange("confirmed", 0)).toBe(false);
+    expect(shouldNotifyConfirmedEventChange("confirmed", 1)).toBe(true);
+    expect(shouldNotifyConfirmedEventChange("confirmed", 2)).toBe(true);
   });
 });
 

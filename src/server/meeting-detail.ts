@@ -6,12 +6,12 @@ import { HALF_DAY_LABEL } from "@/lib/half-day";
 import { getAvailabilityCalendarData } from "@/server/availability";
 import { toIsoDate } from "@/server/availability-rules";
 import { removalOutcomeForInvite, shouldNotifyConfirmedEventChange, type InviteStatus } from "@/server/invite-roster";
-import { notifyConfirmedShootChange, sendInviteEmail, sendReminderEmail } from "@/server/shoot-invite-email";
+import { notifyConfirmedMeetingChange, sendInviteEmail, sendReminderEmail } from "@/server/meeting-invite-email";
 import type { ChangeField } from "@/lib/email-templates";
 
-export async function getShootDetail(shootId: string, organizationId: string) {
-  const shoot = await prisma.shoot.findFirst({
-    where: { id: shootId, filmId: organizationId },
+export async function getMeetingDetail(meetingId: string, organizationId: string) {
+  const meeting = await prisma.meeting.findFirst({
+    where: { id: meetingId, filmId: organizationId },
     include: {
       days: { orderBy: [{ date: "asc" }, { halfDay: "asc" }] },
       slots: {
@@ -21,12 +21,12 @@ export async function getShootDetail(shootId: string, organizationId: string) {
       invites: {
         include: {
           membership: { include: { user: { select: { name: true, email: true } } } },
-          callTimeOverride: true,
+          startTimeOverride: true,
         },
       },
     },
   });
-  return shoot;
+  return meeting;
 }
 
 function generateInviteToken() {
@@ -34,21 +34,20 @@ function generateInviteToken() {
 }
 
 /**
- * Creates one pending ShootInvite per real (non-placeholder) crew member
- * across the shoot's required + general slots — this is what "confirming a
- * shoot" means (issue #9 scope) — then sends each one its invite email with
- * a per-person .ics attachment and no-login accept/decline links (issue #10
- * scope).
+ * Creates one pending MeetingInvite per real (non-placeholder) crew member
+ * across the meeting's required + general slots — this is what "confirming a
+ * meeting" means — then sends each one its invite email with a per-person
+ * .ics attachment and no-login accept/decline links.
  */
-export async function ensureInvitesForShoot(shootId: string) {
-  const slots = await prisma.shootSlot.findMany({
-    where: { shootId, membershipId: { not: null }, removedAt: null },
+export async function ensureInvitesForMeeting(meetingId: string) {
+  const slots = await prisma.meetingSlot.findMany({
+    where: { meetingId, membershipId: { not: null }, removedAt: null },
   });
   const membershipIds = [...new Set(slots.map((s) => s.membershipId!))];
   if (membershipIds.length === 0) return;
 
-  const existing = await prisma.shootInvite.findMany({
-    where: { shootId, membershipId: { in: membershipIds } },
+  const existing = await prisma.meetingInvite.findMany({
+    where: { meetingId, membershipId: { in: membershipIds } },
     select: { membershipId: true },
   });
   const existingIds = new Set(existing.map((e) => e.membershipId));
@@ -57,24 +56,24 @@ export async function ensureInvitesForShoot(shootId: string) {
 
   const created = await Promise.all(
     toCreate.map((membershipId) =>
-      prisma.shootInvite.create({ data: { shootId, membershipId, token: generateInviteToken() } }),
+      prisma.meetingInvite.create({ data: { meetingId, membershipId, token: generateInviteToken() } }),
     ),
   );
 
   await Promise.all(created.map((invite) => sendInviteEmail(invite.id)));
 }
 
-/** Tentative -> Confirmed is an explicit action distinct from creation (issue #9 acceptance criteria). */
-export async function confirmShoot(shootId: string, organizationId: string) {
-  const shoot = await prisma.shoot.findFirstOrThrow({ where: { id: shootId, filmId: organizationId } });
-  if (shoot.status !== "tentative") return shoot;
+/** Tentative -> Confirmed is an explicit action distinct from creation. */
+export async function confirmMeeting(meetingId: string, organizationId: string) {
+  const meeting = await prisma.meeting.findFirstOrThrow({ where: { id: meetingId, filmId: organizationId } });
+  if (meeting.status !== "tentative") return meeting;
 
-  const updated = await prisma.shoot.update({ where: { id: shootId }, data: { status: "confirmed" } });
-  await ensureInvitesForShoot(shootId);
+  const updated = await prisma.meeting.update({ where: { id: meetingId }, data: { status: "confirmed" } });
+  await ensureInvitesForMeeting(meetingId);
   return updated;
 }
 
-export type UpdateShootDetailsInput = {
+export type UpdateMeetingDetailsInput = {
   title?: string;
   locationAddress?: string;
   locationPlaceId?: string | null;
@@ -83,21 +82,24 @@ export type UpdateShootDetailsInput = {
   locationMapUrl?: string;
   locationNotes?: string;
   notes?: string;
-  dayCallTimes?: { dayId: string; defaultCallTime: string }[];
+  dayStartTimes?: { dayId: string; defaultStartTime: string }[];
 };
 
 /**
- * Editing a Confirmed shoot's time or location must never be a silent
- * dashboard-only change (issue #10 acceptance criteria) — this diffs the
- * two fields that actually matter to someone already invited (location,
- * per-day call time; not title/map-link/notes, which are convenience
- * metadata) and fires a change-notification email + fresh .ics when either
- * one moves on an already-Confirmed shoot. A Tentative shoot has no invites
- * to notify either way.
+ * Editing a Confirmed meeting's time or location must never be a silent
+ * dashboard-only change — this diffs the two fields that actually matter to
+ * someone already invited (location, per-day start time; not title/map-link/
+ * notes, which are convenience metadata) and fires a change-notification
+ * email + fresh .ics when either one moves on an already-Confirmed meeting.
+ * A Tentative meeting has no invites to notify either way.
  */
-export async function updateShootDetails(shootId: string, organizationId: string, data: UpdateShootDetailsInput) {
-  const before = await prisma.shoot.findFirst({
-    where: { id: shootId, filmId: organizationId },
+export async function updateMeetingDetails(
+  meetingId: string,
+  organizationId: string,
+  data: UpdateMeetingDetailsInput,
+) {
+  const before = await prisma.meeting.findFirst({
+    where: { id: meetingId, filmId: organizationId },
     include: { days: true },
   });
   if (!before) return;
@@ -113,8 +115,8 @@ export async function updateShootDetails(shootId: string, organizationId: string
     });
   }
 
-  await prisma.shoot.update({
-    where: { id: shootId },
+  await prisma.meeting.update({
+    where: { id: meetingId },
     data: {
       title: data.title !== undefined ? (data.title.trim() || null) : undefined,
       locationAddress: nextLocationAddress,
@@ -127,53 +129,53 @@ export async function updateShootDetails(shootId: string, organizationId: string
     },
   });
 
-  if (data.dayCallTimes) {
+  if (data.dayStartTimes) {
     const dayById = new Map(before.days.map((d) => [d.id, d]));
-    for (const { dayId, defaultCallTime } of data.dayCallTimes) {
+    for (const { dayId, defaultStartTime } of data.dayStartTimes) {
       const day = dayById.get(dayId);
-      if (!day || day.defaultCallTime === defaultCallTime) continue;
+      if (!day || day.defaultStartTime === defaultStartTime) continue;
 
       changes.push({
-        label: `${toIsoDate(day.date)} ${HALF_DAY_LABEL[day.halfDay]} call time`,
-        oldValue: day.defaultCallTime,
-        newValue: defaultCallTime,
+        label: `${toIsoDate(day.date)} ${HALF_DAY_LABEL[day.halfDay]} start time`,
+        oldValue: day.defaultStartTime,
+        newValue: defaultStartTime,
       });
-      await prisma.shootDay.update({ where: { id: dayId }, data: { defaultCallTime } });
+      await prisma.meetingDay.update({ where: { id: dayId }, data: { defaultStartTime } });
     }
   }
 
   if (shouldNotifyConfirmedEventChange(before.status, changes.length)) {
-    await notifyConfirmedShootChange(shootId, changes);
+    await notifyConfirmedMeetingChange(meetingId, changes);
   }
 }
 
-/** Resends a reminder only to that one pending person (issue #9 acceptance criteria). */
+/** Resends a reminder only to that one pending person. */
 export async function nudgeInvite(inviteId: string) {
   await sendReminderEmail(inviteId);
 }
 
 /**
- * Removes a person from a shoot's roster. If they haven't responded yet,
+ * Removes a person from a meeting's roster. If they haven't responded yet,
  * there's no history worth keeping, so the slot and any pending invite are
  * deleted outright. If they already responded, the slot is soft-removed
  * (kept, marked removed) and the invite is left untouched so the historical
- * RSVP record survives (issue #9 acceptance criteria).
+ * RSVP record survives.
  */
-export async function removePersonFromShoot(shootId: string, membershipId: string) {
+export async function removePersonFromMeeting(meetingId: string, membershipId: string) {
   const [slots, invite] = await Promise.all([
-    prisma.shootSlot.findMany({ where: { shootId, membershipId, removedAt: null } }),
-    prisma.shootInvite.findUnique({ where: { shootId_membershipId: { shootId, membershipId } } }),
+    prisma.meetingSlot.findMany({ where: { meetingId, membershipId, removedAt: null } }),
+    prisma.meetingInvite.findUnique({ where: { meetingId_membershipId: { meetingId, membershipId } } }),
   ]);
 
   const outcome = removalOutcomeForInvite(invite?.status ?? null);
 
   if (outcome === "hard-delete") {
     await prisma.$transaction([
-      prisma.shootSlot.deleteMany({ where: { id: { in: slots.map((s) => s.id) } } }),
-      ...(invite ? [prisma.shootInvite.delete({ where: { id: invite.id } })] : []),
+      prisma.meetingSlot.deleteMany({ where: { id: { in: slots.map((s) => s.id) } } }),
+      ...(invite ? [prisma.meetingInvite.delete({ where: { id: invite.id } })] : []),
     ]);
   } else {
-    await prisma.shootSlot.updateMany({
+    await prisma.meetingSlot.updateMany({
       where: { id: { in: slots.map((s) => s.id) } },
       data: { removedAt: new Date() },
     });
@@ -188,40 +190,40 @@ export async function removePersonFromShoot(shootId: string, membershipId: strin
  * resets responseSource back to "crew" (see respondToInvite).
  */
 export async function overrideInviteStatus(
-  shootId: string,
+  meetingId: string,
   organizationId: string,
   inviteId: string,
   status: InviteStatus,
   overriddenByMembershipId: string,
 ) {
-  const invite = await prisma.shootInvite.findFirst({
-    where: { id: inviteId, shootId, shoot: { filmId: organizationId } },
+  const invite = await prisma.meetingInvite.findFirst({
+    where: { id: inviteId, meetingId, meeting: { filmId: organizationId } },
   });
   if (!invite) return;
 
-  await prisma.shootInvite.update({
+  await prisma.meetingInvite.update({
     where: { id: invite.id },
     data: { status, responseSource: "organiser", overriddenByMembershipId, respondedAt: new Date() },
   });
 }
 
-export async function setCallTimeOverride(inviteId: string, shootDayId: string, callTime: string) {
-  if (!callTime) {
-    await prisma.callTimeOverride
-      .delete({ where: { shootInviteId_shootDayId: { shootInviteId: inviteId, shootDayId } } })
+export async function setStartTimeOverride(inviteId: string, meetingDayId: string, startTime: string) {
+  if (!startTime) {
+    await prisma.meetingCallTimeOverride
+      .delete({ where: { meetingInviteId_meetingDayId: { meetingInviteId: inviteId, meetingDayId } } })
       .catch(() => {}); // no override to clear — falling back to the day default is already the resting state
     return;
   }
 
-  await prisma.callTimeOverride.upsert({
-    where: { shootInviteId_shootDayId: { shootInviteId: inviteId, shootDayId } },
-    create: { shootInviteId: inviteId, shootDayId, callTime },
-    update: { callTime },
+  await prisma.meetingCallTimeOverride.upsert({
+    where: { meetingInviteId_meetingDayId: { meetingInviteId: inviteId, meetingDayId } },
+    create: { meetingInviteId: inviteId, meetingDayId, startTime },
+    update: { startTime },
   });
 }
 
-// Same value scale as shoot-suggestions.ts's worst-day rule (issue #8) — unknown
-// is a light penalty between OK and Unavailable, never treated as a red flag.
+// Same value scale as scheduling-suggestions.ts's worst-day rule — unknown is
+// a light penalty between OK and Unavailable, never treated as a red flag.
 const TIER_VALUE: Record<Tier, number> = { best: 1, ok: 0.6, unavailable: 0 };
 const UNKNOWN_VALUE = 0.4;
 
@@ -230,19 +232,21 @@ function tierValue(tier: Tier | null) {
 }
 
 /**
- * Availability ratio only, no roster — a Tentative shoot has no invites yet
- * (issue #9 acceptance criteria). Mirrors the suggestion algorithm's
- * worst-day rule (#8) for a person spanning multiple days of this shoot.
+ * Availability ratio only, no roster — a Tentative meeting has no invites
+ * yet. Mirrors the suggestion algorithm's worst-day rule for a person
+ * spanning multiple days of this meeting.
  */
-export async function getTentativeAvailabilityRatio(shoot: {
+export async function getTentativeAvailabilityRatio(meeting: {
   id: string;
   days: { date: Date; halfDay: "AM" | "PM" }[];
   slots: { membershipId: string | null; removedAt: Date | null }[];
 }) {
-  const membershipIds = [...new Set(shoot.slots.filter((s) => s.membershipId && !s.removedAt).map((s) => s.membershipId!))];
-  if (membershipIds.length === 0 || shoot.days.length === 0) return { availableCount: 0, totalCount: 0 };
+  const membershipIds = [
+    ...new Set(meeting.slots.filter((s) => s.membershipId && !s.removedAt).map((s) => s.membershipId!)),
+  ];
+  if (membershipIds.length === 0 || meeting.days.length === 0) return { availableCount: 0, totalCount: 0 };
 
-  const dates = shoot.days.map((d) => d.date);
+  const dates = meeting.days.map((d) => d.date);
   const windowStart = new Date(Math.min(...dates.map((d) => d.getTime())));
   const windowEnd = new Date(Math.max(...dates.map((d) => d.getTime())));
 
@@ -254,9 +258,9 @@ export async function getTentativeAvailabilityRatio(shoot: {
 
       let worstTier: Tier | null = null;
       let worstValue = Infinity;
-      for (const shootDay of shoot.days) {
-        const cell = byDate.get(toIsoDate(shootDay.date));
-        const tier = shootDay.halfDay === "AM" ? (cell?.am?.tier ?? null) : (cell?.pm?.tier ?? null);
+      for (const meetingDay of meeting.days) {
+        const cell = byDate.get(toIsoDate(meetingDay.date));
+        const tier = meetingDay.halfDay === "AM" ? (cell?.am?.tier ?? null) : (cell?.pm?.tier ?? null);
         const value = tierValue(tier);
         if (value < worstValue) {
           worstValue = value;

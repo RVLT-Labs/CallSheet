@@ -1,14 +1,14 @@
 import { CenteredCard } from "@/components/ui/centered-card";
 import { Button } from "@/components/ui/button";
 import { StatusDot } from "@/components/ui/status-dot";
-import { getInviteByToken } from "@/server/shoot-invite-email";
+import { resolveInviteByToken } from "@/server/invite-lookup";
 
 const STATUS_TONE = { accepted: "forest", declined: "burgundy", pending: "taupe" } as const;
 const STATUS_LABEL = { accepted: "Accepted", declined: "Declined", pending: "Pending" } as const;
 
 export default async function InvitePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const invite = await getInviteByToken(token);
+  const invite = await resolveInviteByToken(token);
 
   if (!invite.ok) {
     return (
@@ -17,7 +17,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
           {invite.reason === "expired" ? "This invite link has expired" : "This invite link isn't valid"}
         </p>
         <p className="text-sm text-ink-soft">
-          Ask whoever&apos;s organising the shoot to send you a fresh link.
+          Ask whoever&apos;s organising it to send you a fresh link.
         </p>
       </CenteredCard>
     );
@@ -25,7 +25,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
 
   return (
     <CenteredCard>
-      <p className="font-display mb-1 text-xl font-bold italic text-burgundy">{invite.shootTitle}</p>
+      <p className="font-display mb-1 text-xl font-bold italic text-burgundy">{invite.eventTitle}</p>
       <p className="mb-6 text-sm text-ink-soft">Hi {invite.recipientName}, here&apos;s your invite.</p>
 
       <div className="mb-6">

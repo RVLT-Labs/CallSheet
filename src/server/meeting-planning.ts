@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { getAvailabilityCalendarData } from "@/server/availability";
 import { parseIsoDateUtc } from "@/server/availability-rules";
-import { ensureInvitesForShoot } from "@/server/shoot-detail";
+import { getFilmCrew } from "@/server/shoot-planning";
+import { ensureInvitesForMeeting } from "@/server/meeting-detail";
 import {
   rankCandidates,
   type CandidateSlot,
@@ -9,14 +10,6 @@ import {
   type PersonAvailability,
   type RankedCandidate,
 } from "@/server/scheduling-suggestions";
-
-export async function getFilmCrew(organizationId: string) {
-  return prisma.member.findMany({
-    where: { organizationId },
-    select: { id: true, roleTags: true, user: { select: { name: true } } },
-    orderBy: { user: { name: "asc" } },
-  });
-}
 
 export type SlotSelection = { membershipIds: string[]; placeholderLabels: string[] };
 
@@ -42,7 +35,7 @@ function toSlots(selection: SlotSelection, crewById: Map<string, string>): Candi
   return [...memberSlots, ...placeholderSlots];
 }
 
-export async function suggestShootDates(
+export async function suggestMeetingDates(
   organizationId: string,
   filmWindow: { start: Date; end: Date },
   input: SuggestDatesInput,
@@ -80,20 +73,20 @@ export async function suggestShootDates(
   return results.slice(0, 10);
 }
 
-export type ConfirmShootInput = {
+export type ConfirmMeetingInput = {
   status: "tentative" | "confirmed";
   dayIsos: string[];
   halfDayPreference: HalfDayPreference;
-  defaultCallTime: string;
+  defaultStartTime: string;
   required: SlotSelection;
   general: SlotSelection;
 };
 
-export async function createShoot(organizationId: string, input: ConfirmShootInput) {
+export async function createMeeting(organizationId: string, input: ConfirmMeetingInput) {
   const halfDaysPerDay: ("AM" | "PM")[] =
     input.halfDayPreference === "EITHER" ? ["AM", "PM"] : [input.halfDayPreference];
 
-  const shoot = await prisma.shoot.create({
+  const meeting = await prisma.meeting.create({
     data: {
       filmId: organizationId,
       status: input.status,
@@ -102,7 +95,7 @@ export async function createShoot(organizationId: string, input: ConfirmShootInp
           halfDaysPerDay.map((halfDay) => ({
             date: parseIsoDateUtc(dateIso),
             halfDay,
-            defaultCallTime: input.defaultCallTime,
+            defaultStartTime: input.defaultStartTime,
           })),
         ),
       },
@@ -129,25 +122,28 @@ export async function createShoot(organizationId: string, input: ConfirmShootInp
     },
   });
 
-  if (input.status === "confirmed") await ensureInvitesForShoot(shoot.id);
+  if (input.status === "confirmed") await ensureInvitesForMeeting(meeting.id);
 
-  return shoot;
+  return meeting;
 }
 
 /**
  * Reassigns a placeholder slot to a real crew member without recreating the
- * shoot (issue #8 acceptance criteria) — the slot row is updated in place.
+ * meeting — the slot row is updated in place.
  */
-export async function swapPlaceholderForMember(shootSlotId: string, membershipId: string) {
-  const slot = await prisma.shootSlot.findUniqueOrThrow({ where: { id: shootSlotId }, include: { shoot: true } });
+export async function swapPlaceholderForMember(meetingSlotId: string, membershipId: string) {
+  const slot = await prisma.meetingSlot.findUniqueOrThrow({
+    where: { id: meetingSlotId },
+    include: { meeting: true },
+  });
   if (slot.membershipId) throw new Error("Slot already holds a real crew member");
 
-  await prisma.shootSlot.update({
-    where: { id: shootSlotId },
+  await prisma.meetingSlot.update({
+    where: { id: meetingSlotId },
     data: { membershipId, placeholderLabel: null },
   });
 
-  // A shoot that's already Confirmed already sent its invites — a newly
+  // A meeting that's already Confirmed already sent its invites — a newly
   // swapped-in real person needs one too, same as everyone else on the roster.
-  if (slot.shoot.status === "confirmed") await ensureInvitesForShoot(slot.shootId);
+  if (slot.meeting.status === "confirmed") await ensureInvitesForMeeting(slot.meetingId);
 }

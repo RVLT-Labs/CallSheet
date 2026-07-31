@@ -106,6 +106,7 @@ model Organization {
   members     Member[]
   invitations Invitation[]
   shoots      Shoot[]
+  meetings    Meeting[]
 
   @@map("organization")
 }
@@ -123,11 +124,14 @@ model Member {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  availability      Availability[]
-  recurringRules    RecurringAvailabilityRule[]
-  shootInvites      ShootInvite[]
-  overriddenInvites ShootInvite[]               @relation("InviteOverriddenBy")
-  requiredOnSlots   ShootSlot[]
+  availability             Availability[]
+  recurringRules           RecurringAvailabilityRule[]
+  shootInvites             ShootInvite[]
+  overriddenInvites        ShootInvite[]               @relation("InviteOverriddenBy")
+  requiredOnSlots          ShootSlot[]
+  meetingInvites           MeetingInvite[]
+  overriddenMeetingInvites MeetingInvite[]             @relation("MeetingInviteOverriddenBy")
+  requiredOnMeetingSlots   MeetingSlot[]
 
   @@unique([organizationId, userId])
   @@map("member")
@@ -329,4 +333,112 @@ model CallTimeOverride {
   shootDay    ShootDay    @relation(fields: [shootDayId], references: [id], onDelete: Cascade)
 
   @@unique([shootInviteId, shootDayId])
+}
+
+// ---------- Meetings ----------
+// Mirrors the Shoot vertical slice (planning, RSVP roster, .ics invites, tentative/confirmed
+// states) for non-shoot production meetings (crew meetings, tech scouts, production meetings).
+// Kept as a separate model rather than unifying with Shoot so the two remain independently
+// evolvable — a meeting has no call sheet/roster-of-record semantics a shoot has.
+
+enum MeetingStatus {
+  tentative
+  confirmed
+}
+
+model Meeting {
+  id              String        @id @default(cuid())
+  filmId          String
+  status          MeetingStatus @default(tentative)
+  title           String? // organiser-set label; falls back to the date range when unset, same as Shoot.title
+  locationAddress String?
+  locationPlaceId String? // Google Places place_id backing locationAddress, when set via the Places autocomplete picker
+  locationLat     Float?
+  locationLng     Float?
+  locationMapUrl  String? // auto-filled from the picked place; still a plain editable field for a manually pasted link when Places isn't used
+  locationNotes   String?
+  notes           String?
+  icsUid          String        @unique @default(cuid()) // stable across edits so calendar apps update, not duplicate
+  icsSequence     Int           @default(0) // incremented on every confirmed-meeting time/location change
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  film    Organization    @relation(fields: [filmId], references: [id], onDelete: Cascade)
+  days    MeetingDay[]
+  slots   MeetingSlot[]
+  invites MeetingInvite[]
+
+  @@index([filmId])
+}
+
+model MeetingDay {
+  id               String   @id @default(cuid())
+  meetingId        String
+  date             DateTime @db.Date
+  halfDay          HalfDay
+  defaultStartTime String // "HH:mm"
+
+  meeting               Meeting                @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  startTimeOverride MeetingCallTimeOverride[]
+
+  @@unique([meetingId, date, halfDay])
+}
+
+enum MeetingSlotKind {
+  required
+  general
+}
+
+// A slot is either a real Member (membershipId set) or a placeholder (placeholderLabel set, membershipId null).
+// Required slots hard-block candidate dates in the suggestion algorithm; general slots never do — mirrors ShootSlot.
+model MeetingSlot {
+  id               String          @id @default(cuid())
+  meetingId        String
+  kind             MeetingSlotKind
+  membershipId     String?
+  placeholderLabel String? // e.g. "TBD Producer" — used when membershipId is null
+  removedAt        DateTime? // set instead of deleting when the person already has an RSVP response, so history is preserved; slots removed before ever responding are deleted outright instead
+
+  meeting    Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  membership Member? @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@index([meetingId])
+  @@index([membershipId])
+}
+
+model MeetingInvite {
+  id                       String               @id @default(cuid())
+  meetingId                String
+  membershipId             String
+  status                   InviteStatus         @default(pending)
+  responseSource           InviteResponseSource @default(crew)
+  overriddenByMembershipId String? // organiser who last set the status, when responseSource = organiser
+  token                    String               @unique // signed/random token for no-login accept/decline links
+  sentAt                   DateTime?
+  respondedAt              DateTime?
+  lastReminderSentAt       DateTime?
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+
+  meeting           Meeting                   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  membership        Member                    @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  overriddenBy      Member?                   @relation("MeetingInviteOverriddenBy", fields: [overriddenByMembershipId], references: [id], onDelete: SetNull)
+  startTimeOverride MeetingCallTimeOverride[]
+
+  @@unique([meetingId, membershipId])
+  @@index([membershipId])
+  @@index([overriddenByMembershipId])
+}
+
+// Per-person, per-day start time override — falls back to MeetingDay.defaultStartTime when absent.
+model MeetingCallTimeOverride {
+  id              String @id @default(cuid())
+  meetingInviteId String
+  meetingDayId    String
+  startTime       String // "HH:mm"
+
+  meetingInvite MeetingInvite @relation(fields: [meetingInviteId], references: [id], onDelete: Cascade)
+  meetingDay    MeetingDay    @relation(fields: [meetingDayId], references: [id], onDelete: Cascade)
+
+  @@unique([meetingInviteId, meetingDayId])
 }

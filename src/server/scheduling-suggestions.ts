@@ -1,6 +1,7 @@
-// Pure shoot-date ranking logic (spec §4.5). Kept free of Prisma/DB calls so
-// the hard-gate and worst-day rules are unit-testable without a database —
-// see shoot-suggestions.test.ts.
+// Pure date-ranking logic (spec §4.5), shared by shoot and meeting planning —
+// nothing in here is shoot- or meeting-specific. Kept free of Prisma/DB calls
+// so the hard-gate and worst-day rules are unit-testable without a database —
+// see scheduling-suggestions.test.ts.
 
 import { toIsoDate } from "@/server/availability-rules";
 import type { Tier } from "@/lib/availability-tiers";

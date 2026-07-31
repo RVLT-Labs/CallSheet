@@ -49,9 +49,18 @@ function button(label: string, url: string, variant: "primary" | "secondary") {
   return `<a href="${url}" style="display:inline-block;padding:12px 22px;border-radius:6px;font-family:${BODY_FONT};font-size:13.5px;font-weight:bold;text-decoration:none;${styles}">${label}</a>`;
 }
 
-function dateLineHtml(dateLabel: string, halfDayLabel: string, callTime: string) {
-  return `<p style="margin:0 0 4px 0;font-family:${BODY_FONT};font-size:13.5px;color:${COLOR.ink};">${dateLabel} · ${halfDayLabel} · Call ${callTime}</p>`;
+function dateLineHtml(dateLabel: string, halfDayLabel: string, timeLabel: string, time: string) {
+  return `<p style="margin:0 0 4px 0;font-family:${BODY_FONT};font-size:13.5px;color:${COLOR.ink};">${dateLabel} · ${halfDayLabel} · ${timeLabel} ${time}</p>`;
 }
+
+// Shoots use "Call" (call time, film-crew jargon); meetings use "Start" — same
+// date-line shape, different noun (dateLineHtml, the .ics attached-line copy,
+// and the "View shoot"/"View meeting" button all key off this).
+export type EventKind = "shoot" | "meeting";
+
+const EVENT_NOUN: Record<EventKind, string> = { shoot: "shoot", meeting: "meeting" };
+const TIME_LABEL: Record<EventKind, string> = { shoot: "Call", meeting: "Start" };
+const TIME_NOUN: Record<EventKind, string> = { shoot: "call time", meeting: "start time" };
 
 // Same deterministic name -> color hash as the Avatar component (design system
 // §5.4), reimplemented table-based so it renders in clients without CSS gradients
@@ -75,20 +84,22 @@ function avatarHtml(name: string) {
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;"><tr><td width="52" height="52" align="center" valign="middle" style="width:52px;height:52px;border-radius:26px;background-color:${avatarColorFor(name)};font-family:${BODY_FONT};font-size:18px;font-weight:bold;color:${COLOR.white};">${initialsFor(name)}</td></tr></table>`;
 }
 
-export type InviteEmailDay = { dateLabel: string; halfDayLabel: string; callTime: string };
+export type InviteEmailDay = { dateLabel: string; halfDayLabel: string; time: string };
 
 export function renderInviteEmail(params: {
+  kind: EventKind;
   recipientName: string;
-  shootTitle: string;
+  eventTitle: string;
   days: InviteEmailDay[];
   locationAddress: string | null;
   locationNotes: string | null;
   acceptUrl: string;
   declineUrl: string;
 }) {
-  const { recipientName, shootTitle, days, locationAddress, locationNotes, acceptUrl, declineUrl } = params;
+  const { kind, recipientName, eventTitle, days, locationAddress, locationNotes, acceptUrl, declineUrl } = params;
+  const timeLabel = TIME_LABEL[kind];
 
-  const daysHtml = days.map((d) => dateLineHtml(d.dateLabel, d.halfDayLabel, d.callTime)).join("");
+  const daysHtml = days.map((d) => dateLineHtml(d.dateLabel, d.halfDayLabel, timeLabel, d.time)).join("");
   const locationHtml = locationAddress
     ? `<p style="margin:16px 0 0 0;font-family:${BODY_FONT};font-size:13.5px;color:${COLOR.inkSoft};">${locationAddress}</p>`
     : "";
@@ -98,7 +109,7 @@ export function renderInviteEmail(params: {
 
   const html = shell(`
     <p style="margin:0 0 16px 0;">Hi ${recipientName},</p>
-    <p style="margin:0 0 16px 0;">You're invited to <strong>${shootTitle}</strong>.</p>
+    <p style="margin:0 0 16px 0;">You're invited to <strong>${eventTitle}</strong>.</p>
     ${daysHtml}
     ${locationHtml}
     ${notesHtml}
@@ -107,13 +118,13 @@ export function renderInviteEmail(params: {
       <span style="display:inline-block;width:10px;"></span>
       ${button("Decline", declineUrl, "secondary")}
     </div>
-    <p style="margin:24px 0 0 0;font-size:12px;color:${COLOR.inkSoft};">A calendar invite for this shoot is attached, set to your call time.</p>
+    <p style="margin:24px 0 0 0;font-size:12px;color:${COLOR.inkSoft};">A calendar invite for this ${EVENT_NOUN[kind]} is attached, set to your ${TIME_NOUN[kind]}.</p>
   `);
 
   const text = [
     `Hi ${recipientName},`,
-    `You're invited to ${shootTitle}.`,
-    ...days.map((d) => `${d.dateLabel} - ${d.halfDayLabel} - Call ${d.callTime}`),
+    `You're invited to ${eventTitle}.`,
+    ...days.map((d) => `${d.dateLabel} - ${d.halfDayLabel} - ${timeLabel} ${d.time}`),
     locationAddress ?? "",
     locationNotes ?? "",
     `Accept: ${acceptUrl}`,
@@ -122,18 +133,19 @@ export function renderInviteEmail(params: {
     .filter(Boolean)
     .join("\n");
 
-  return { subject: `You're invited: ${shootTitle}`, html, text };
+  return { subject: `You're invited: ${eventTitle}`, html, text };
 }
 
 export type ChangeField = { label: string; oldValue: string; newValue: string };
 
 export function renderChangeNotificationEmail(params: {
+  kind: EventKind;
   recipientName: string;
-  shootTitle: string;
+  eventTitle: string;
   changes: ChangeField[];
   viewUrl: string;
 }) {
-  const { recipientName, shootTitle, changes, viewUrl } = params;
+  const { kind, recipientName, eventTitle, changes, viewUrl } = params;
 
   const changesHtml = changes
     .map(
@@ -149,30 +161,30 @@ export function renderChangeNotificationEmail(params: {
 
   const html = shell(`
     <p style="margin:0 0 16px 0;">Hi ${recipientName},</p>
-    <p style="margin:0 0 16px 0;"><strong>${shootTitle}</strong> has changed.</p>
+    <p style="margin:0 0 16px 0;"><strong>${eventTitle}</strong> has changed.</p>
     ${changesHtml}
     <div style="margin-top:24px;">
-      ${button("View shoot", viewUrl, "primary")}
+      ${button(`View ${EVENT_NOUN[kind]}`, viewUrl, "primary")}
     </div>
     <p style="margin:24px 0 0 0;font-size:12px;color:${COLOR.inkSoft};">An updated calendar invite is attached, replacing the previous one.</p>
   `);
 
   const text = [
     `Hi ${recipientName},`,
-    `${shootTitle} has changed.`,
+    `${eventTitle} has changed.`,
     ...changes.map((c) => `${c.label}: ${c.oldValue} -> ${c.newValue}`),
     `View: ${viewUrl}`,
   ].join("\n");
 
-  return { subject: `${shootTitle} has changed`, html, text };
+  return { subject: `${eventTitle} has changed`, html, text };
 }
 
-export function renderReminderEmail(params: { recipientName: string; shootTitle: string; viewUrl: string }) {
-  const { recipientName, shootTitle, viewUrl } = params;
+export function renderReminderEmail(params: { recipientName: string; eventTitle: string; viewUrl: string }) {
+  const { recipientName, eventTitle, viewUrl } = params;
 
   const html = shell(`
     <p style="margin:0 0 16px 0;">Hi ${recipientName},</p>
-    <p style="margin:0 0 16px 0;">A reminder that you haven't responded to <strong>${shootTitle}</strong> yet.</p>
+    <p style="margin:0 0 16px 0;">A reminder that you haven't responded to <strong>${eventTitle}</strong> yet.</p>
     <div style="margin-top:8px;">
       ${button("Respond now", viewUrl, "primary")}
     </div>
@@ -180,11 +192,11 @@ export function renderReminderEmail(params: { recipientName: string; shootTitle:
 
   const text = [
     `Hi ${recipientName},`,
-    `A reminder that you haven't responded to ${shootTitle} yet.`,
+    `A reminder that you haven't responded to ${eventTitle} yet.`,
     `Respond: ${viewUrl}`,
   ].join("\n");
 
-  return { subject: `Reminder: ${shootTitle}`, html, text };
+  return { subject: `Reminder: ${eventTitle}`, html, text };
 }
 
 export function renderMagicLinkEmail(params: { url: string }) {

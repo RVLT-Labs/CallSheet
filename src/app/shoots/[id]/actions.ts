@@ -11,7 +11,7 @@ import {
   setCallTimeOverride,
   updateShootDetails,
 } from "@/server/shoot-detail";
-import type { InviteStatus } from "@/server/shoot-roster";
+import type { InviteStatus } from "@/server/invite-roster";
 
 export async function confirmShootAction(shootId: string) {
   const { organizationId } = await requireActiveOrganiserFilm();
