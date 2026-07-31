@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
-import { CrewToday } from "@/components/dashboard/crew-today";
-import { OrganiserDashboard } from "@/components/dashboard/organiser-dashboard";
+import { CrewToday, type CrewTodayItem } from "@/components/dashboard/crew-today";
+import { OrganiserDashboard, type OrganiserDashboardItem } from "@/components/dashboard/organiser-dashboard";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { DashboardTour } from "@/components/onboarding/dashboard-tour";
 import { FilmPicker } from "@/components/film-picker/film-picker";
@@ -12,9 +12,18 @@ import { LandingPage } from "@/components/marketing/landing-page";
 import { NavShell } from "@/components/ui/nav-shell";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getOrganiserUpcomingShoots } from "@/server/dashboard";
+import { getOrganiserUpcomingMeetings, getOrganiserUpcomingShoots } from "@/server/dashboard";
 import { getMembershipsForUser } from "@/server/memberships";
+import { getMyMeetingsData } from "@/server/my-meetings";
 import { getMyShootsData } from "@/server/my-shoots";
+
+function earliestDateIso(dateIsos: string[]) {
+  return dateIsos[0] ?? "";
+}
+
+function byEarliestDate(a: { dateIsos: string[] }, b: { dateIsos: string[] }) {
+  return earliestDateIso(a.dateIsos).localeCompare(earliestDateIso(b.dateIsos));
+}
 
 export default async function Home({
   searchParams,
@@ -69,7 +78,16 @@ export default async function Home({
   const isOrganiser = activeFilm.role !== "member";
 
   if (isOrganiser) {
-    const upcoming = await getOrganiserUpcomingShoots(film.id);
+    const [upcomingShoots, upcomingMeetings] = await Promise.all([
+      getOrganiserUpcomingShoots(film.id),
+      getOrganiserUpcomingMeetings(film.id),
+    ]);
+    const upcoming: OrganiserDashboardItem[] = [
+      ...upcomingShoots.map((shoot) => ({ ...shoot, kind: "shoot" as const })),
+      ...upcomingMeetings.map((meeting) => ({ ...meeting, kind: "meeting" as const })),
+    ]
+      .sort(byEarliestDate)
+      .slice(0, 6);
     const { tour } = await searchParams;
 
     return (
@@ -84,7 +102,14 @@ export default async function Home({
   const membership = await prisma.member.findUniqueOrThrow({
     where: { organizationId_userId: { organizationId: film.id, userId: session.user.id } },
   });
-  const { upcoming } = await getMyShootsData(membership.id, film.id, film.showTentativeToCrew);
+  const [{ upcoming: upcomingShoots }, { upcoming: upcomingMeetings }] = await Promise.all([
+    getMyShootsData(membership.id, film.id, film.showTentativeToCrew),
+    getMyMeetingsData(membership.id, film.id, film.showTentativeToCrew),
+  ]);
+  const upcoming: CrewTodayItem[] = [
+    ...upcomingShoots.map((shoot) => ({ ...shoot, kind: "shoot" as const })),
+    ...upcomingMeetings.map((meeting) => ({ ...meeting, kind: "meeting" as const })),
+  ].sort(byEarliestDate);
 
   return (
     <NavShell activeHref="/" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={activeOrganizationId}>
