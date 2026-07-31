@@ -1,17 +1,18 @@
-// Pure RSVP/roster business rules (issue #9 acceptance criteria). Kept free of
-// Prisma/DB calls so the remove/nudge/call-time rules are unit-testable
-// without a database — see shoot-roster.test.ts.
+// Pure RSVP/roster business rules, shared by shoots and meetings (issue #9
+// acceptance criteria). Kept free of Prisma/DB calls so the remove/nudge/time
+// rules are unit-testable without a database — see invite-roster.test.ts.
 
 export type InviteStatus = "pending" | "accepted" | "declined";
 
 // Who last set an invite's status — mirrors the availability manual-overrides-recurring
 // precedence rule: an organiser override holds until the crew member responds via their
-// own accept/decline link, which always wins (see respondToInvite in shoot-invite-email.ts).
+// own accept/decline link, which always wins (see respondToInvite in shoot-invite-email.ts
+// and meeting-invite-email.ts).
 export type InviteResponseSource = "crew" | "organiser";
 
-/** Per-person call-time override falls back to that day's default when unset. */
-export function resolveEffectiveCallTime(dayDefaultCallTime: string, override: string | null | undefined) {
-  return override && override.length > 0 ? override : dayDefaultCallTime;
+/** Per-person time override falls back to that day's default when unset. */
+export function resolveEffectiveTime(dayDefaultTime: string, override: string | null | undefined) {
+  return override && override.length > 0 ? override : dayDefaultTime;
 }
 
 /** Nudge only ever targets a still-pending invite, never someone who already responded. */
@@ -50,12 +51,12 @@ export function countRsvpStatuses(invites: { status: InviteStatus }[]): RsvpCoun
 }
 
 /**
- * A Tentative shoot has no invites to notify (issue #9), so an edit is silent
- * either way. A Confirmed shoot's time/location change must never be a silent
- * dashboard-only update (issue #10 acceptance criteria) — this is the gate
- * that decides whether an edit fires notification emails.
+ * A Tentative shoot/meeting has no invites to notify (issue #9), so an edit is
+ * silent either way. A Confirmed one's time/location change must never be a
+ * silent dashboard-only update (issue #10 acceptance criteria) — this is the
+ * gate that decides whether an edit fires notification emails.
  */
-export function shouldNotifyShootChange(status: "tentative" | "confirmed", changedFieldCount: number) {
+export function shouldNotifyConfirmedEventChange(status: "tentative" | "confirmed", changedFieldCount: number) {
   return status === "confirmed" && changedFieldCount > 0;
 }
 

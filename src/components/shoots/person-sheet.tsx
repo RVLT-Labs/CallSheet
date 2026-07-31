@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { StatusDot } from "@/components/ui/status-dot";
 import { HALF_DAY_LABEL } from "@/lib/half-day";
-import { canNudgeInvite, inviteStatusLabel, type InviteResponseSource, type InviteStatus } from "@/server/shoot-roster";
+import { canNudgeInvite, inviteStatusLabel, type InviteResponseSource, type InviteStatus } from "@/server/invite-roster";
 
 import {
   nudgeInviteAction,

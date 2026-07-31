@@ -8,7 +8,7 @@ import {
   type HalfDayPreference,
   type PersonAvailability,
   type RankedCandidate,
-} from "@/server/shoot-suggestions";
+} from "@/server/scheduling-suggestions";
 
 export async function getFilmCrew(organizationId: string) {
   return prisma.member.findMany({

@@ -5,7 +5,7 @@ import { PageShell } from "@/components/ui/page-shell";
 import { StatusDot } from "@/components/ui/status-dot";
 import { NOTHING_SCHEDULED_COPY } from "@/lib/my-shoots-rules";
 import type { MyShoot } from "@/server/my-shoots";
-import { inviteStatusLabel } from "@/server/shoot-roster";
+import { inviteStatusLabel } from "@/server/invite-roster";
 
 const INVITE_TONE = { accepted: "forest", declined: "burgundy", pending: "taupe" } as const;
 

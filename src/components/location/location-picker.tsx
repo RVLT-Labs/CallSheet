@@ -21,10 +21,11 @@ type LocationPickerProps = {
 };
 
 /**
- * Shoot location address field. With NEXT_PUBLIC_GOOGLE_MAPS_API_KEY set this
- * becomes a Places autocomplete that also captures coordinates + a map link
- * and shows a small preview map; without a key it degrades to the plain
- * address text field it replaced, so local dev works without Maps billing set up.
+ * Location address field, shared by shoots and meetings. With
+ * NEXT_PUBLIC_GOOGLE_MAPS_API_KEY set this becomes a Places autocomplete that
+ * also captures coordinates + a map link and shows a small preview map;
+ * without a key it degrades to the plain address text field it replaced, so
+ * local dev works without Maps billing set up.
  */
 export function LocationPicker({ value, onChange }: LocationPickerProps) {
   if (!GOOGLE_MAPS_API_KEY) {

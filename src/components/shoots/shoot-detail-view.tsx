@@ -11,9 +11,9 @@ import { Sheet } from "@/components/ui/sheet";
 import { TextField } from "@/components/ui/text-field";
 import { TextAreaField } from "@/components/ui/textarea-field";
 import { HALF_DAY_LABEL } from "@/lib/half-day";
-import { countRsvpStatuses, inviteStatusLabel, type InviteResponseSource, type InviteStatus } from "@/server/shoot-roster";
-import { LocationMap } from "@/components/shoots/location-map";
-import { LocationPicker, type LocationFields } from "@/components/shoots/location-picker";
+import { countRsvpStatuses, inviteStatusLabel, type InviteResponseSource, type InviteStatus } from "@/server/invite-roster";
+import { LocationMap } from "@/components/location/location-map";
+import { LocationPicker, type LocationFields } from "@/components/location/location-picker";
 
 import {
   confirmShootAction,

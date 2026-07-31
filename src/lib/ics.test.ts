@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { buildInviteIcs } from "@/lib/ics";
 
 const baseInput = {
-  shootTitle: "Rooftop scene",
+  eventTitle: "Rooftop scene",
+  filename: "shoot.ics",
   locationAddress: "123 Main St, Springfield",
   locationLat: null as number | null,
   locationLng: null as number | null,
@@ -11,8 +12,7 @@ const baseInput = {
   locationNotes: "Parking around back",
   icsUid: "shoot-abc",
   icsSequence: 0,
-  days: [{ id: "day-1", dateIso: "2026-08-05", halfDay: "AM" as const, defaultCallTime: "08:00" }],
-  overridesByDayId: new Map<string, string>(),
+  days: [{ id: "day-1", dateIso: "2026-08-05", halfDay: "AM" as const, startTime: "08:00" }],
 };
 
 describe("buildInviteIcs", () => {

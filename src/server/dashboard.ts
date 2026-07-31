@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { toIsoDate } from "@/server/availability-rules";
-import { countRsvpStatuses } from "@/server/shoot-roster";
+import { countRsvpStatuses } from "@/server/invite-roster";
 
 export type OrganiserDashboardShoot = {
   id: string;

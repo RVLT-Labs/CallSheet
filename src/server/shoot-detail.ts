@@ -5,7 +5,7 @@ import type { Tier } from "@/lib/availability-tiers";
 import { HALF_DAY_LABEL } from "@/lib/half-day";
 import { getAvailabilityCalendarData } from "@/server/availability";
 import { toIsoDate } from "@/server/availability-rules";
-import { removalOutcomeForInvite, shouldNotifyShootChange, type InviteStatus } from "@/server/shoot-roster";
+import { removalOutcomeForInvite, shouldNotifyConfirmedEventChange, type InviteStatus } from "@/server/invite-roster";
 import { notifyConfirmedShootChange, sendInviteEmail, sendReminderEmail } from "@/server/shoot-invite-email";
 import type { ChangeField } from "@/lib/email-templates";
 
@@ -142,7 +142,7 @@ export async function updateShootDetails(shootId: string, organizationId: string
     }
   }
 
-  if (shouldNotifyShootChange(before.status, changes.length)) {
+  if (shouldNotifyConfirmedEventChange(before.status, changes.length)) {
     await notifyConfirmedShootChange(shootId, changes);
   }
 }

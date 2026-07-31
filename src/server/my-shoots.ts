@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { isShootVisibleToCrew } from "@/lib/my-shoots-rules";
 import { toIsoDate } from "@/server/availability-rules";
-import type { InviteResponseSource } from "@/server/shoot-roster";
+import type { InviteResponseSource } from "@/server/invite-roster";
 
 export type MyShoot = {
   id: string;

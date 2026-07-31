@@ -10,7 +10,7 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { TextField } from "@/components/ui/text-field";
 import { TIER_LABEL, type Tier } from "@/lib/availability-tiers";
 import { confirmShoot, suggestDates } from "@/app/shoots/new/actions";
-import type { HalfDayPreference, RankedCandidate } from "@/server/shoot-suggestions";
+import type { HalfDayPreference, RankedCandidate } from "@/server/scheduling-suggestions";
 
 type Step = 1 | 2 | 3 | 4;
 type CrewState = "off" | "general" | "required";

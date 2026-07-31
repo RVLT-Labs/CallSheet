@@ -14,7 +14,7 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { StickyFooterAction } from "@/components/ui/sticky-footer-action";
 import { NOTHING_SCHEDULED_COPY, needsStickyAcceptAllFooter, splitSoonestPending } from "@/lib/my-shoots-rules";
 import type { MyShoot } from "@/server/my-shoots";
-import { inviteStatusLabel } from "@/server/shoot-roster";
+import { inviteStatusLabel } from "@/server/invite-roster";
 
 const INVITE_TONE = { accepted: "forest", declined: "burgundy", pending: "taupe" } as const;
 

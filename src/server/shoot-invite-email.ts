@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { sendTemplatedEmail } from "@/lib/email";
-import { buildInviteIcs, type IcsShootDay } from "@/lib/ics";
+import { buildInviteIcs, type IcsEventDay } from "@/lib/ics";
 import {
   renderChangeNotificationEmail,
   renderInviteEmail,
@@ -9,7 +9,7 @@ import {
   type InviteEmailDay,
 } from "@/lib/email-templates";
 import { toIsoDate } from "@/server/availability-rules";
-import { canNudgeInvite, resolveEffectiveCallTime } from "@/server/shoot-roster";
+import { canNudgeInvite, resolveEffectiveTime } from "@/server/invite-roster";
 import { isInviteTokenExpired } from "@/server/invite-token";
 import { HALF_DAY_LABEL } from "@/lib/half-day";
 
@@ -28,8 +28,16 @@ async function loadInviteForEmail(inviteId: string) {
   });
 }
 
-function icsDaysFor(days: { id: string; date: Date; halfDay: "AM" | "PM"; defaultCallTime: string }[]): IcsShootDay[] {
-  return days.map((d) => ({ id: d.id, dateIso: toIsoDate(d.date), halfDay: d.halfDay, defaultCallTime: d.defaultCallTime }));
+function icsDaysFor(
+  days: { id: string; date: Date; halfDay: "AM" | "PM"; defaultCallTime: string }[],
+  overridesByDayId: Map<string, string>,
+): IcsEventDay[] {
+  return days.map((d) => ({
+    id: d.id,
+    dateIso: toIsoDate(d.date),
+    halfDay: d.halfDay,
+    startTime: resolveEffectiveTime(d.defaultCallTime, overridesByDayId.get(d.id)),
+  }));
 }
 
 /**
@@ -46,11 +54,12 @@ export async function sendInviteEmail(inviteId: string) {
   const days: InviteEmailDay[] = invite.shoot.days.map((d) => ({
     dateLabel: toIsoDate(d.date),
     halfDayLabel: HALF_DAY_LABEL[d.halfDay],
-    callTime: resolveEffectiveCallTime(d.defaultCallTime, overridesByDayId.get(d.id)),
+    time: resolveEffectiveTime(d.defaultCallTime, overridesByDayId.get(d.id)),
   }));
 
   const ics = buildInviteIcs({
-    shootTitle,
+    eventTitle: shootTitle,
+    filename: "shoot.ics",
     locationAddress: invite.shoot.locationAddress,
     locationLat: invite.shoot.locationLat,
     locationLng: invite.shoot.locationLng,
@@ -58,14 +67,14 @@ export async function sendInviteEmail(inviteId: string) {
     locationNotes: invite.shoot.locationNotes,
     icsUid: invite.shoot.icsUid,
     icsSequence: invite.shoot.icsSequence,
-    days: icsDaysFor(invite.shoot.days),
-    overridesByDayId,
+    days: icsDaysFor(invite.shoot.days, overridesByDayId),
   });
 
   const base = appBaseUrl();
   const { subject, html, text } = renderInviteEmail({
+    kind: "shoot",
     recipientName: invite.membership.user.name,
-    shootTitle,
+    eventTitle: shootTitle,
     days,
     locationAddress: invite.shoot.locationAddress,
     locationNotes: invite.shoot.locationNotes,
@@ -95,7 +104,7 @@ export async function sendReminderEmail(inviteId: string) {
   const shootTitle = invite.shoot.title ?? "your shoot";
   const { subject, html, text } = renderReminderEmail({
     recipientName: invite.membership.user.name,
-    shootTitle,
+    eventTitle: shootTitle,
     viewUrl: `${appBaseUrl()}/invite/${invite.token}`,
   });
 
@@ -140,7 +149,8 @@ export async function notifyConfirmedShootChange(shootId: string, changes: Chang
     invites.map(async (invite) => {
       const overridesByDayId = new Map(invite.callTimeOverride.map((o) => [o.shootDayId, o.callTime]));
       const ics = buildInviteIcs({
-        shootTitle,
+        eventTitle: shootTitle,
+        filename: "shoot.ics",
         locationAddress: shoot.locationAddress,
         locationLat: shoot.locationLat,
         locationLng: shoot.locationLng,
@@ -148,13 +158,13 @@ export async function notifyConfirmedShootChange(shootId: string, changes: Chang
         locationNotes: shoot.locationNotes,
         icsUid: shoot.icsUid,
         icsSequence: shoot.icsSequence,
-        days: icsDaysFor(shoot.days),
-        overridesByDayId,
+        days: icsDaysFor(shoot.days, overridesByDayId),
       });
 
       const { subject, html, text } = renderChangeNotificationEmail({
+        kind: "shoot",
         recipientName: invite.membership.user.name,
-        shootTitle,
+        eventTitle: shootTitle,
         changes,
         viewUrl: `${base}/invite/${invite.token}`,
       });

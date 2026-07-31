@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { cn } from "@/lib/cn";
 import { ProfileMenu } from "@/components/nav/profile-menu";
-import { CalendarIcon, ClapperboardIcon, HomeIcon } from "@/components/ui/icons";
+import { CalendarIcon, ClapperboardIcon, HomeIcon, UsersIcon } from "@/components/ui/icons";
 import type { Membership } from "@/server/memberships";
 
 export type NavItem = {
@@ -27,6 +27,7 @@ export const DEFAULT_NAV_ITEMS: NavItem[] = [
   { label: "Today", href: "/", icon: HomeIcon },
   { label: "Availability", href: "/availability", icon: CalendarIcon, tourId: "nav-availability" },
   { label: "Shoots", href: "/shoots", icon: ClapperboardIcon, tourId: "nav-shoots" },
+  { label: "Meetings", href: "/meetings", icon: UsersIcon, tourId: "nav-meetings" },
 ];
 
 type NavProps = {
