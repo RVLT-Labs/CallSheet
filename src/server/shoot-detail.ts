@@ -5,7 +5,7 @@ import type { Tier } from "@/lib/availability-tiers";
 import { HALF_DAY_LABEL } from "@/lib/half-day";
 import { getAvailabilityCalendarData } from "@/server/availability";
 import { toIsoDate } from "@/server/availability-rules";
-import { removalOutcomeForInvite, shouldNotifyShootChange } from "@/server/shoot-roster";
+import { removalOutcomeForInvite, shouldNotifyShootChange, type InviteStatus } from "@/server/shoot-roster";
 import { notifyConfirmedShootChange, sendInviteEmail, sendReminderEmail } from "@/server/shoot-invite-email";
 import type { ChangeField } from "@/lib/email-templates";
 
@@ -178,6 +178,31 @@ export async function removePersonFromShoot(shootId: string, membershipId: strin
       data: { removedAt: new Date() },
     });
   }
+}
+
+/**
+ * Organiser-set RSVP status — deciding for someone who hasn't responded yet,
+ * or overriding e.g. a Declined to Accepted. Same manual-overrides-recurring
+ * precedence shape as availability (spec §10): this holds until the crew
+ * member responds via their own accept/decline link, which always wins and
+ * resets responseSource back to "crew" (see respondToInvite).
+ */
+export async function overrideInviteStatus(
+  shootId: string,
+  organizationId: string,
+  inviteId: string,
+  status: InviteStatus,
+  overriddenByMembershipId: string,
+) {
+  const invite = await prisma.shootInvite.findFirst({
+    where: { id: inviteId, shootId, shoot: { filmId: organizationId } },
+  });
+  if (!invite) return;
+
+  await prisma.shootInvite.update({
+    where: { id: invite.id },
+    data: { status, responseSource: "organiser", overriddenByMembershipId, respondedAt: new Date() },
+  });
 }
 
 export async function setCallTimeOverride(inviteId: string, shootDayId: string, callTime: string) {

@@ -202,7 +202,13 @@ export async function respondToInvite(token: string, response: "accepted" | "dec
 
   await prisma.shootInvite.update({
     where: { id: invite.id },
-    data: { status: response, respondedAt: new Date() },
+    data: {
+      status: response,
+      respondedAt: new Date(),
+      // The crew member's own response always wins over a prior organiser override.
+      responseSource: "crew",
+      overriddenByMembershipId: null,
+    },
   });
 
   return { ok: true, shootTitle: invite.shoot.title ?? "the shoot", status: response };

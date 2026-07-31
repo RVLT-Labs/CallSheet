@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { isShootVisibleToCrew } from "@/lib/my-shoots-rules";
 import { toIsoDate } from "@/server/availability-rules";
+import type { InviteResponseSource } from "@/server/shoot-roster";
 
 export type MyShoot = {
   id: string;
@@ -9,6 +10,7 @@ export type MyShoot = {
   dateIsos: string[];
   inviteId: string | null;
   inviteStatus: "pending" | "accepted" | "declined" | null;
+  inviteResponseSource: InviteResponseSource | null;
 };
 
 function shootDateIsos(days: { date: Date }[]) {
@@ -26,7 +28,7 @@ export async function getMyShootsData(membershipId: string, organizationId: stri
       shoot: {
         include: {
           days: { orderBy: { date: "asc" } },
-          invites: { where: { membershipId }, select: { id: true, status: true } },
+          invites: { where: { membershipId }, select: { id: true, status: true, responseSource: true } },
         },
       },
     },
@@ -46,6 +48,7 @@ export async function getMyShootsData(membershipId: string, organizationId: stri
         dateIsos: shootDateIsos(shoot.days),
         inviteId: invite?.id ?? null,
         inviteStatus: invite?.status ?? null,
+        inviteResponseSource: invite?.responseSource ?? null,
       };
     });
 
@@ -69,6 +72,12 @@ export async function respondAsMember(inviteId: string, membershipId: string, re
 
   await prisma.shootInvite.update({
     where: { id: inviteId },
-    data: { status: response, respondedAt: new Date() },
+    data: {
+      status: response,
+      respondedAt: new Date(),
+      // The crew member's own response always wins over a prior organiser override.
+      responseSource: "crew",
+      overriddenByMembershipId: null,
+    },
   });
 }
