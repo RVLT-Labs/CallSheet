@@ -77,6 +77,9 @@ export async function confirmShoot(shootId: string, organizationId: string) {
 export type UpdateShootDetailsInput = {
   title?: string;
   locationAddress?: string;
+  locationPlaceId?: string | null;
+  locationLat?: number | null;
+  locationLng?: number | null;
   locationMapUrl?: string;
   locationNotes?: string;
   notes?: string;
@@ -115,6 +118,9 @@ export async function updateShootDetails(shootId: string, organizationId: string
     data: {
       title: data.title !== undefined ? (data.title.trim() || null) : undefined,
       locationAddress: nextLocationAddress,
+      locationPlaceId: data.locationPlaceId !== undefined ? data.locationPlaceId : undefined,
+      locationLat: data.locationLat !== undefined ? data.locationLat : undefined,
+      locationLng: data.locationLng !== undefined ? data.locationLng : undefined,
       locationMapUrl: data.locationMapUrl !== undefined ? (data.locationMapUrl.trim() || null) : undefined,
       locationNotes: data.locationNotes !== undefined ? (data.locationNotes.trim() || null) : undefined,
       notes: data.notes !== undefined ? (data.notes.trim() || null) : undefined,

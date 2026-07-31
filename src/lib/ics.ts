@@ -18,6 +18,9 @@ export type IcsShootDay = {
 export type BuildInviteIcsInput = {
   shootTitle: string;
   locationAddress: string | null;
+  locationLat: number | null;
+  locationLng: number | null;
+  locationMapUrl: string | null;
   locationNotes: string | null;
   icsUid: string;
   icsSequence: number;
@@ -49,6 +52,11 @@ export function buildInviteIcs(input: BuildInviteIcsInput): { filename: string; 
       start: toDateArray(day.dateIso, callTime),
       duration: { hours: DEFAULT_DURATION_HOURS },
       location: input.locationAddress ?? undefined,
+      geo:
+        input.locationLat != null && input.locationLng != null
+          ? { lat: input.locationLat, lon: input.locationLng }
+          : undefined,
+      url: input.locationMapUrl ?? undefined,
       description: input.locationNotes ?? undefined,
       status: "CONFIRMED",
     };

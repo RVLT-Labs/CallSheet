@@ -52,6 +52,9 @@ export async function sendInviteEmail(inviteId: string) {
   const ics = buildInviteIcs({
     shootTitle,
     locationAddress: invite.shoot.locationAddress,
+    locationLat: invite.shoot.locationLat,
+    locationLng: invite.shoot.locationLng,
+    locationMapUrl: invite.shoot.locationMapUrl,
     locationNotes: invite.shoot.locationNotes,
     icsUid: invite.shoot.icsUid,
     icsSequence: invite.shoot.icsSequence,
@@ -139,6 +142,9 @@ export async function notifyConfirmedShootChange(shootId: string, changes: Chang
       const ics = buildInviteIcs({
         shootTitle,
         locationAddress: shoot.locationAddress,
+        locationLat: shoot.locationLat,
+        locationLng: shoot.locationLng,
+        locationMapUrl: shoot.locationMapUrl,
         locationNotes: shoot.locationNotes,
         icsUid: shoot.icsUid,
         icsSequence: shoot.icsSequence,
