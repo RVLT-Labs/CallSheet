@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 import { CenteredCard } from "@/components/ui/centered-card";
-import { MagicLinkFlow } from "@/components/auth/magic-link-flow";
+import { EmailCodeFlow } from "@/components/auth/email-code-flow";
 import { authClient, useSession } from "@/lib/auth-client";
 
 type Props = {
@@ -17,7 +17,7 @@ type Props = {
 
 /**
  * Accepting the invite logs the person straight in (spec §4.1): once the
- * magic-link click authenticates them back on this same page, this effect
+ * email-code verification authenticates them on this same page, this effect
  * finishes the job by accepting the invitation and dropping them at home.
  */
 export function AcceptInvitationClient({ invitationId, inviterName, filmName, role, email }: Props) {
@@ -37,7 +37,7 @@ export function AcceptInvitationClient({ invitationId, inviterName, filmName, ro
 
   return (
     <CenteredCard>
-      <MagicLinkFlow
+      <EmailCodeFlow
         callbackURL={`/accept-invitation/${invitationId}`}
         invite={{ inviterName, filmName, role, email }}
       />

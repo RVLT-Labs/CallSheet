@@ -1,11 +1,24 @@
 import { betterAuth, getBaseURL } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { organization, magicLink } from "better-auth/plugins";
+import { organization } from "better-auth/plugins";
+import { emailOTP } from "better-auth/plugins/email-otp";
+import { passkey } from "@better-auth/passkey";
 import { nextCookies } from "better-auth/next-js";
 
 import { prisma } from "@/lib/prisma";
 import { sendTemplatedEmail } from "@/lib/email";
-import { renderMagicLinkEmail, renderCrewInvitationEmail } from "@/lib/email-templates";
+import { renderEmailCodeEmail, renderCrewInvitationEmail } from "@/lib/email-templates";
+
+// getBaseURL() resolves the same way Better Auth resolves its own baseURL
+// (BETTER_AUTH_URL env, then related conventions). The passkey plugin needs its
+// rpID (the WebAuthn relying party ID — the site's bare hostname) up front, so
+// resolve it eagerly and fail loudly if unconfigured rather than registering
+// passkeys against the wrong origin.
+const baseURL = getBaseURL(undefined, "/");
+if (!baseURL) {
+  throw new Error("BETTER_AUTH_URL is not set — cannot configure auth.");
+}
+const rpID = new URL(baseURL).hostname;
 
 // Films are modelled as Better Auth Organizations, crew as Members, per spec §4.1.
 // Organiser = org owner/admin, crew = org member — Better Auth's default roles map
@@ -13,8 +26,9 @@ import { renderMagicLinkEmail, renderCrewInvitationEmail } from "@/lib/email-tem
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: "postgresql" }),
 
-  // Email-only, no passwords (spec §4.1) — the magic-link plugin below is the only
-  // sign-in method. There is no separate first-party session here to protect.
+  // Email-only, no passwords (spec §4.1) — email code is the universal sign-in
+  // method, passkey is the fast path for returning users on a recognized device.
+  // There is no separate first-party session here to protect.
   user: {
     additionalFields: {
       phone: { type: "string", required: false },
@@ -22,12 +36,15 @@ export const auth = betterAuth({
   },
 
   plugins: [
-    magicLink({
-      sendMagicLink: async ({ email, url }) => {
-        const { subject, html, text } = renderMagicLinkEmail({ url });
+    emailOTP({
+      // Only used for sign-in (and, transitively, first-time sign-up — the app
+      // has no password reset or email-change flows to cover the other types).
+      sendVerificationOTP: async ({ email, otp }) => {
+        const { subject, html, text } = renderEmailCodeEmail({ otp });
         await sendTemplatedEmail({ to: email, subject, html, text });
       },
     }),
+    passkey({ rpID, rpName: "Callsheet" }),
     organization({
       schema: {
         organization: {

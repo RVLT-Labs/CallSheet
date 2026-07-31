@@ -1,6 +1,6 @@
 # Callsheet
 
-Scheduling app for student/indie film crews: magic-link auth, half-day availability input, auto-suggested shoot dates, email + `.ics` invites with Accept/Decline, and a live RSVP dashboard.
+Scheduling app for student/indie film crews: email-code + passkey auth, half-day availability input, auto-suggested shoot dates, email + `.ics` invites with Accept/Decline, and a live RSVP dashboard.
 
 Build tracking lives in GitHub Issues — see [#23](https://github.com/RVLT-Labs/CallSheet/issues/23) for the full roadmap and dependency-ordered build sequence.
 
@@ -8,7 +8,7 @@ Build tracking lives in GitHub Issues — see [#23](https://github.com/RVLT-Labs
 
 - **Next.js 16** (App Router, Turbopack)
 - **Postgres + Prisma 7** (new `prisma-client` generator + `@prisma/adapter-pg` driver adapter — see `prisma/schema.prisma`)
-- **Better Auth** — magic-link plugin (passwordless) + organization plugin (Film = Organization, crew = Member)
+- **Better Auth** — email-otp plugin + `@better-auth/passkey` plugin (passwordless) + organization plugin (Film = Organization, crew = Member)
 - **Resend** — transactional email, will also carry `.ics` calendar attachments (issue #10)
 
 ## Local setup
@@ -62,7 +62,7 @@ Build tracking lives in GitHub Issues — see [#23](https://github.com/RVLT-Labs
 
 ## Auth notes
 
-- Sign-in is magic-link only, no passwords. The route handler lives at `src/app/api/auth/[...all]/route.ts`; config is in `src/lib/auth.ts` (server) and `src/lib/auth-client.ts` (client).
+- Sign-in is email-code or passkey, no passwords. Passkeys must be registered from an authenticated session (`/profile`) before they can be used to sign in — there's no first-time passkey sign-up. The route handler lives at `src/app/api/auth/[...all]/route.ts`; config is in `src/lib/auth.ts` (server) and `src/lib/auth-client.ts` (client).
 - A Film is a Better Auth Organization; crew membership is a Member row. Organiser = org owner/admin, crew = org member — this maps directly onto Better Auth's default roles, no custom access-control needed.
 - Film-specific fields (working date range, poster, status, the 3 privacy toggles) are `additionalFields` on the organization schema, not a separate `Film` table — see spec §4.1 and §6.
 - Without a real `RESEND_API_KEY`, email sends fail at request time with an auth error from Resend's API — everything else (session/token creation, Prisma writes) still works, which is enough to develop against locally.

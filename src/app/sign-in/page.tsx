@@ -1,10 +1,12 @@
 import { CenteredCard } from "@/components/ui/centered-card";
-import { MagicLinkFlow } from "@/components/auth/magic-link-flow";
+import { EmailCodeFlow } from "@/components/auth/email-code-flow";
+import { PasskeySignIn } from "@/components/auth/passkey-sign-in";
 
 export default function SignInPage() {
   return (
     <CenteredCard>
-      <MagicLinkFlow callbackURL="/" />
+      <PasskeySignIn callbackURL="/" />
+      <EmailCodeFlow callbackURL="/" />
     </CenteredCard>
   );
 }

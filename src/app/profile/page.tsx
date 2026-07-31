@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { CenteredCard } from "@/components/ui/centered-card";
 import { NavShell } from "@/components/ui/nav-shell";
 import { ProfileForm } from "@/components/profile/profile-form";
+import { PasskeyManager } from "@/components/profile/passkey-manager";
 import { auth } from "@/lib/auth";
 import { getProfileContext } from "@/server/profile";
 
@@ -25,6 +26,7 @@ export default async function ProfilePage() {
       <CenteredCard wide>
         <h1 className="mb-5 text-base font-bold">Your profile</h1>
         <ProfileForm name={user.name} phone={user.phone} membership={membership} />
+        <PasskeyManager />
       </CenteredCard>
     </NavShell>
   );
