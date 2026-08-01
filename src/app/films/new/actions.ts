@@ -46,17 +46,40 @@ export async function createFilm(input: CreateFilmInput) {
     await prisma.user.update({ where: { id: session.user.id }, data: { onboardedAt: new Date() } });
   }
 
-  for (const invite of input.invites) {
-    await auth.api.createInvitation({
-      headers: requestHeaders,
-      body: {
-        email: invite.email,
-        role: "member",
-        organizationId: organization.id,
-        roleTags: invite.role ? [invite.role] : [],
-      },
-    });
+  // The organiser is auto-added as the "owner" member above, so inviting their
+  // own address here would be rejected by better-auth as already-a-member —
+  // silently skip it rather than surfacing that as a confusing invite failure.
+  const ownEmail = session.user.email.toLowerCase();
+  const invitesToSend = input.invites.filter((invite) => invite.email.toLowerCase() !== ownEmail);
+
+  // Invites are best-effort (the wizard copy says "you can skip this and invite
+  // later"): a single failure — e.g. a transient email-provider error, or an
+  // invite better-auth rejects for a domain reason (already a member, already
+  // invited) — must not wipe out the film that was just created, or leave the
+  // organiser stuck on this step with no way forward. Collect failures instead
+  // of throwing.
+  const failedInvites: string[] = [];
+  for (const invite of invitesToSend) {
+    try {
+      await auth.api.createInvitation({
+        headers: requestHeaders,
+        body: {
+          email: invite.email,
+          role: "member",
+          organizationId: organization.id,
+          roleTags: invite.role ? [invite.role] : [],
+        },
+      });
+    } catch (err) {
+      console.error(`Failed to invite ${invite.email} to ${organization.id}:`, err);
+      failedInvites.push(invite.email);
+    }
   }
 
-  return { filmId: organization.id, filmName: organization.name, invitedCount: input.invites.length };
+  return {
+    filmId: organization.id,
+    filmName: organization.name,
+    invitedCount: invitesToSend.length - failedInvites.length,
+    failedInvites,
+  };
 }
