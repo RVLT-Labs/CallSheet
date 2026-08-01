@@ -46,17 +46,32 @@ export async function createFilm(input: CreateFilmInput) {
     await prisma.user.update({ where: { id: session.user.id }, data: { onboardedAt: new Date() } });
   }
 
+  // Invites are best-effort (the wizard copy says "you can skip this and invite
+  // later"): a single failed send — e.g. a transient Resend error — must not
+  // wipe out the film that was just created, or leave the organiser stuck on
+  // this step with no way forward. Collect failures instead of throwing.
+  const failedInvites: string[] = [];
   for (const invite of input.invites) {
-    await auth.api.createInvitation({
-      headers: requestHeaders,
-      body: {
-        email: invite.email,
-        role: "member",
-        organizationId: organization.id,
-        roleTags: invite.role ? [invite.role] : [],
-      },
-    });
+    try {
+      await auth.api.createInvitation({
+        headers: requestHeaders,
+        body: {
+          email: invite.email,
+          role: "member",
+          organizationId: organization.id,
+          roleTags: invite.role ? [invite.role] : [],
+        },
+      });
+    } catch (err) {
+      console.error(`Failed to invite ${invite.email} to ${organization.id}:`, err);
+      failedInvites.push(invite.email);
+    }
   }
 
-  return { filmId: organization.id, filmName: organization.name, invitedCount: input.invites.length };
+  return {
+    filmId: organization.id,
+    filmName: organization.name,
+    invitedCount: input.invites.length - failedInvites.length,
+    failedInvites,
+  };
 }

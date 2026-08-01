@@ -47,7 +47,9 @@ export function FilmCreationWizard({ finalRedirect = "/" }: { finalRedirect?: st
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ filmName: string; invitedCount: number } | null>(null);
+  const [result, setResult] = useState<{ filmName: string; invitedCount: number; failedInvites: string[] } | null>(
+    null,
+  );
 
   function addSingleInvite() {
     const email = singleEmail.trim();
@@ -81,7 +83,7 @@ export function FilmCreationWizard({ finalRedirect = "/" }: { finalRedirect?: st
     setError(null);
     try {
       const res = await createFilm({ title, company, dateStart, dateEnd, posterUrl, invites });
-      setResult({ filmName: res.filmName, invitedCount: res.invitedCount });
+      setResult({ filmName: res.filmName, invitedCount: res.invitedCount, failedInvites: res.failedInvites });
       setStep(3);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong creating the film.");
@@ -247,6 +249,15 @@ export function FilmCreationWizard({ finalRedirect = "/" }: { finalRedirect?: st
           ? `${result.invitedCount} ${result.invitedCount === 1 ? "invite is" : "invites are"} on their way. Here's what happens next.`
           : "Here's what happens next."}
       </p>
+
+      {result && result.failedInvites.length > 0 && (
+        <p className="mb-6 max-w-[230px] text-[12.5px] leading-relaxed text-burgundy">
+          {result.failedInvites.length === 1
+            ? `Couldn't send an invite to ${result.failedInvites[0]}.`
+            : `Couldn't send invites to ${result.failedInvites.length} people.`}{" "}
+          You can resend from Settings.
+        </p>
+      )}
 
       <div className="mb-6 w-full text-left">
         {[
