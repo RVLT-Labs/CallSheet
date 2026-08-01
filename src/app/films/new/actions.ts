@@ -46,12 +46,20 @@ export async function createFilm(input: CreateFilmInput) {
     await prisma.user.update({ where: { id: session.user.id }, data: { onboardedAt: new Date() } });
   }
 
+  // The organiser is auto-added as the "owner" member above, so inviting their
+  // own address here would be rejected by better-auth as already-a-member —
+  // silently skip it rather than surfacing that as a confusing invite failure.
+  const ownEmail = session.user.email.toLowerCase();
+  const invitesToSend = input.invites.filter((invite) => invite.email.toLowerCase() !== ownEmail);
+
   // Invites are best-effort (the wizard copy says "you can skip this and invite
-  // later"): a single failed send — e.g. a transient Resend error — must not
-  // wipe out the film that was just created, or leave the organiser stuck on
-  // this step with no way forward. Collect failures instead of throwing.
+  // later"): a single failure — e.g. a transient email-provider error, or an
+  // invite better-auth rejects for a domain reason (already a member, already
+  // invited) — must not wipe out the film that was just created, or leave the
+  // organiser stuck on this step with no way forward. Collect failures instead
+  // of throwing.
   const failedInvites: string[] = [];
-  for (const invite of input.invites) {
+  for (const invite of invitesToSend) {
     try {
       await auth.api.createInvitation({
         headers: requestHeaders,
@@ -71,7 +79,7 @@ export async function createFilm(input: CreateFilmInput) {
   return {
     filmId: organization.id,
     filmName: organization.name,
-    invitedCount: input.invites.length - failedInvites.length,
+    invitedCount: invitesToSend.length - failedInvites.length,
     failedInvites,
   };
 }
