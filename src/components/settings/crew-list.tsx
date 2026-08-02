@@ -1,6 +1,6 @@
 "use client";
 
-import { useOptimistic, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 
 import { Avatar } from "@/components/ui/avatar";
 import { ErrorToast } from "@/components/ui/error-toast";
@@ -12,30 +12,24 @@ type CrewMember = { id: string; roleTags: string[]; user: { id: string; name: st
 
 type InvitedCrew = { email: string; roleTags: string[] };
 
-type OptimisticState = { removedIds: string[]; invited: InvitedCrew[] };
-
 export function CrewList({ crew }: { crew: CrewMember[] }) {
   const [adding, setAdding] = useState(false);
   const [email, setEmail] = useState("");
   const [roles, setRoles] = useState<string[]>([]);
   const [removedIds, setRemovedIds] = useState<string[]>([]);
   const [invited, setInvited] = useState<InvitedCrew[]>([]);
-  const [optimistic, applyOptimistic] = useOptimistic<OptimisticState, { type: "remove"; id: string } | { type: "invite"; invitee: InvitedCrew }>(
-    { removedIds, invited },
-    (state, action) =>
-      action.type === "remove"
-        ? { ...state, removedIds: [...state.removedIds, action.id] }
-        : { ...state, invited: [...state.invited, action.invitee] },
-  );
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const visibleCrew = crew.filter((c) => !optimistic.removedIds.includes(c.id));
+  const visibleCrew = crew.filter((c) => !removedIds.includes(c.id));
 
   function toggleRole(role: string) {
     setRoles((prev) => (prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]));
   }
 
+  // State is committed up front (not via useOptimistic) and rolled back on failure —
+  // dispatching an optimistic add and later committing the same entry to real state
+  // inside one transition briefly double-applies it (duplicate list entry/React key).
   function handleAdd() {
     const trimmed = email.trim();
     if (!trimmed) return;
@@ -43,15 +37,15 @@ export function CrewList({ crew }: { crew: CrewMember[] }) {
     setEmail("");
     setRoles([]);
     setAdding(false);
+    setInvited((prev) => [...prev, invitee]);
     startTransition(async () => {
-      applyOptimistic({ type: "invite", invitee });
       try {
         const formData = new FormData();
         formData.set("email", trimmed);
         invitee.roleTags.forEach((r) => formData.append("role", r));
         await addCrewMember(formData);
-        setInvited((prev) => [...prev, invitee]);
       } catch {
+        setInvited((prev) => prev.filter((i) => i !== invitee));
         setError(`Couldn't invite ${trimmed}. Try again.`);
       }
     });
@@ -59,14 +53,14 @@ export function CrewList({ crew }: { crew: CrewMember[] }) {
 
   function handleRemove(member: CrewMember) {
     if (!confirm(`Remove ${member.user.name} from the crew?`)) return;
+    setRemovedIds((prev) => [...prev, member.id]);
     startTransition(async () => {
-      applyOptimistic({ type: "remove", id: member.id });
       try {
         const formData = new FormData();
         formData.set("memberId", member.id);
         await removeCrewMember(formData);
-        setRemovedIds((prev) => [...prev, member.id]);
       } catch {
+        setRemovedIds((prev) => prev.filter((id) => id !== member.id));
         setError(`Couldn't remove ${member.user.name}. Try again.`);
       }
     });
@@ -74,7 +68,7 @@ export function CrewList({ crew }: { crew: CrewMember[] }) {
 
   return (
     <div>
-      {visibleCrew.length === 0 && optimistic.invited.length === 0 && (
+      {visibleCrew.length === 0 && invited.length === 0 && (
         <p className="py-2.5 text-[12.5px] text-ink-soft">No crew yet. Invite people to join the film.</p>
       )}
 
@@ -99,7 +93,7 @@ export function CrewList({ crew }: { crew: CrewMember[] }) {
         </div>
       ))}
 
-      {optimistic.invited.map((invitee) => (
+      {invited.map((invitee) => (
         <div key={invitee.email} className="flex items-center gap-2.5 border-b border-hairline py-2.5">
           <Avatar name={invitee.email} />
           <div className="flex-1">

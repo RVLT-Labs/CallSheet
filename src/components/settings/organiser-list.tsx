@@ -1,6 +1,6 @@
 "use client";
 
-import { useOptimistic, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 
 import { Avatar } from "@/components/ui/avatar";
 import { ErrorToast } from "@/components/ui/error-toast";
@@ -12,26 +12,25 @@ export function OrganiserList({ organisers, currentUserId }: { organisers: Organ
   const [adding, setAdding] = useState(false);
   const [email, setEmail] = useState("");
   const [invitedEmails, setInvitedEmails] = useState<string[]>([]);
-  const [optimisticInvites, addOptimisticInvite] = useOptimistic(invitedEmails, (state, invitedEmail: string) => [
-    ...state,
-    invitedEmail,
-  ]);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  // Committed up front and rolled back on failure, not via useOptimistic — dispatching
+  // an optimistic add and later committing the same entry to real state inside one
+  // transition briefly double-applies it (duplicate list entry/React key).
   function handleAdd() {
     const trimmed = email.trim();
     if (!trimmed) return;
     setEmail("");
     setAdding(false);
+    setInvitedEmails((prev) => [...prev, trimmed]);
     startTransition(async () => {
-      addOptimisticInvite(trimmed);
       try {
         const formData = new FormData();
         formData.set("email", trimmed);
         await addOrganiser(formData);
-        setInvitedEmails((prev) => [...prev, trimmed]);
       } catch {
+        setInvitedEmails((prev) => prev.filter((e) => e !== trimmed));
         setError(`Couldn't invite ${trimmed}. Try again.`);
       }
     });
@@ -47,7 +46,7 @@ export function OrganiserList({ organisers, currentUserId }: { organisers: Organ
         </div>
       ))}
 
-      {optimisticInvites.map((invitedEmail) => (
+      {invitedEmails.map((invitedEmail) => (
         <div key={invitedEmail} className="flex items-center gap-2.5 border-b border-hairline py-2.5">
           <Avatar name={invitedEmail} />
           <span className="flex-1 text-[13px] font-medium text-ink-soft">{invitedEmail}</span>
