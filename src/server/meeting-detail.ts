@@ -3,7 +3,7 @@ import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import type { Tier } from "@/lib/availability-tiers";
 import { HALF_DAY_LABEL } from "@/lib/half-day";
-import { getAvailabilityCalendarData } from "@/server/availability";
+import { getAvailabilityCalendarDataBatch } from "@/server/availability";
 import { toIsoDate } from "@/server/availability-rules";
 import { removalOutcomeForInvite, shouldNotifyConfirmedEventChange, type InviteStatus } from "@/server/invite-roster";
 import { notifyConfirmedMeetingChange, sendInviteEmail, sendReminderEmail } from "@/server/meeting-invite-email";
@@ -250,26 +250,26 @@ export async function getTentativeAvailabilityRatio(meeting: {
   const windowStart = new Date(Math.min(...dates.map((d) => d.getTime())));
   const windowEnd = new Date(Math.max(...dates.map((d) => d.getTime())));
 
-  let availableCount = 0;
-  await Promise.all(
-    membershipIds.map(async (membershipId) => {
-      const { days } = await getAvailabilityCalendarData(membershipId, windowStart, windowEnd);
-      const byDate = new Map(days.map((d) => [d.dateIso, d]));
+  const calendarByMembership = await getAvailabilityCalendarDataBatch(membershipIds, windowStart, windowEnd);
 
-      let worstTier: Tier | null = null;
-      let worstValue = Infinity;
-      for (const meetingDay of meeting.days) {
-        const cell = byDate.get(toIsoDate(meetingDay.date));
-        const tier = meetingDay.halfDay === "AM" ? (cell?.am?.tier ?? null) : (cell?.pm?.tier ?? null);
-        const value = tierValue(tier);
-        if (value < worstValue) {
-          worstValue = value;
-          worstTier = tier;
-        }
+  let availableCount = 0;
+  for (const membershipId of membershipIds) {
+    const days = calendarByMembership.get(membershipId)?.days ?? [];
+    const byDate = new Map(days.map((d) => [d.dateIso, d]));
+
+    let worstTier: Tier | null = null;
+    let worstValue = Infinity;
+    for (const meetingDay of meeting.days) {
+      const cell = byDate.get(toIsoDate(meetingDay.date));
+      const tier = meetingDay.halfDay === "AM" ? (cell?.am?.tier ?? null) : (cell?.pm?.tier ?? null);
+      const value = tierValue(tier);
+      if (value < worstValue) {
+        worstValue = value;
+        worstTier = tier;
       }
-      if (worstTier === "best" || worstTier === "ok") availableCount++;
-    }),
-  );
+    }
+    if (worstTier === "best" || worstTier === "ok") availableCount++;
+  }
 
   return { availableCount, totalCount: membershipIds.length };
 }
