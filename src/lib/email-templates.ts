@@ -222,13 +222,14 @@ export function renderEmailCodeEmail(params: { otp: string }) {
 export function renderCrewInvitationEmail(params: {
   inviterName: string;
   filmName: string;
-  roleTag: string | null;
+  roleTags: string[];
   url: string;
 }) {
-  const { inviterName, filmName, roleTag, url } = params;
+  const { inviterName, filmName, roleTags, url } = params;
+  const roleLabel = roleTags.join(", ");
 
-  const roleHtml = roleTag
-    ? `<p style="margin:4px 0 0 0;font-family:${BODY_FONT};font-size:12.5px;color:${COLOR.inkSoft};text-transform:capitalize;text-align:center;">${roleTag}</p>`
+  const roleHtml = roleLabel
+    ? `<p style="margin:4px 0 0 0;font-family:${BODY_FONT};font-size:12.5px;color:${COLOR.inkSoft};text-transform:capitalize;text-align:center;">${roleLabel}</p>`
     : "";
 
   const html = shell(`
@@ -246,7 +247,7 @@ export function renderCrewInvitationEmail(params: {
 
   const text = [
     `${inviterName} added you to crew on ${filmName} on Callsheet.`,
-    roleTag ?? "",
+    roleLabel,
     `Accept: ${url}`,
   ]
     .filter(Boolean)

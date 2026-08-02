@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
-import { BottomTabBar, TopNav, type NavUser } from "@/components/ui/nav";
+import { BottomTabBar, TopNav, DEFAULT_NAV_ITEMS, type NavItem, type NavUser } from "@/components/ui/nav";
+import { SettingsIcon } from "@/components/ui/icons";
 import { getMembershipsForUser } from "@/server/memberships";
 
 /**
@@ -28,14 +29,24 @@ export async function NavShell({
 }) {
   const memberships = user ? await getMembershipsForUser(user.id) : { active: [], wrapped: [] };
 
+  // Crew & Settings is organiser-only — /settings itself redirects crew away,
+  // so don't dangle a nav item that just redirects them straight back out.
+  const currentMembership = [...memberships.active, ...memberships.wrapped].find(
+    (m) => m.organization.id === activeOrganizationId,
+  );
+  const isOrganiser = currentMembership && currentMembership.role !== "member";
+  const items: NavItem[] = isOrganiser
+    ? [...DEFAULT_NAV_ITEMS, { label: "Crew & Settings", href: "/settings", icon: SettingsIcon }]
+    : DEFAULT_NAV_ITEMS;
+
   return (
     <>
-      <TopNav activeHref={activeHref} user={user} activeOrganizationId={activeOrganizationId} memberships={memberships} />
+      <TopNav items={items} activeHref={activeHref} user={user} activeOrganizationId={activeOrganizationId} memberships={memberships} />
       {/* cream-deep canvas on desktop only — gives page content (a PageShell
           sheet, or CenteredCard) a background to sit on top of, so it doesn't
           just blend into the page (mobile stays edge-to-edge, no canvas). */}
       <div className="flex flex-1 flex-col md:bg-cream-deep">{children}</div>
-      <BottomTabBar activeHref={activeHref} user={user} activeOrganizationId={activeOrganizationId} memberships={memberships} />
+      <BottomTabBar items={items} activeHref={activeHref} user={user} activeOrganizationId={activeOrganizationId} memberships={memberships} />
     </>
   );
 }

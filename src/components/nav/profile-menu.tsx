@@ -29,10 +29,6 @@ export function ProfileMenu({ name, activeHref, activeOrganizationId, membership
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const profileActive = activeHref === "/profile";
-  const currentMembership = [...memberships.active, ...memberships.wrapped].find(
-    (m) => m.organization.id === activeOrganizationId,
-  );
-  const isOrganiser = currentMembership && currentMembership.role !== "member";
   const { switchingId, switchTo } = useFilmSwitch(activeOrganizationId);
 
   useEffect(() => {
@@ -68,15 +64,6 @@ export function ProfileMenu({ name, activeHref, activeOrganizationId, membership
         >
           Your profile
         </Link>
-        {isOrganiser && (
-          <Link
-            href="/settings"
-            onClick={() => setOpen(false)}
-            className="text-[13px] font-semibold text-burgundy"
-          >
-            Film settings
-          </Link>
-        )}
         <SignOutButton />
       </div>
     </div>

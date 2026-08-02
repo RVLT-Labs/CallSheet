@@ -4,46 +4,53 @@ import { useOptimistic, useState, useTransition } from "react";
 
 import { Avatar } from "@/components/ui/avatar";
 import { ErrorToast } from "@/components/ui/error-toast";
+import { RoleChip } from "@/components/ui/role-chip";
 import { ROLE_PRESETS } from "@/lib/roles";
 import { addCrewMember, removeCrewMember } from "@/app/settings/actions";
 
 type CrewMember = { id: string; roleTags: string[]; user: { id: string; name: string } };
 
-type OptimisticState = { removedIds: string[]; invitedEmails: string[] };
+type InvitedCrew = { email: string; roleTags: string[] };
+
+type OptimisticState = { removedIds: string[]; invited: InvitedCrew[] };
 
 export function CrewList({ crew }: { crew: CrewMember[] }) {
   const [adding, setAdding] = useState(false);
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("");
+  const [roles, setRoles] = useState<string[]>([]);
   const [removedIds, setRemovedIds] = useState<string[]>([]);
-  const [invitedEmails, setInvitedEmails] = useState<string[]>([]);
-  const [optimistic, applyOptimistic] = useOptimistic<OptimisticState, { type: "remove"; id: string } | { type: "invite"; email: string }>(
-    { removedIds, invitedEmails },
+  const [invited, setInvited] = useState<InvitedCrew[]>([]);
+  const [optimistic, applyOptimistic] = useOptimistic<OptimisticState, { type: "remove"; id: string } | { type: "invite"; invitee: InvitedCrew }>(
+    { removedIds, invited },
     (state, action) =>
       action.type === "remove"
         ? { ...state, removedIds: [...state.removedIds, action.id] }
-        : { ...state, invitedEmails: [...state.invitedEmails, action.email] },
+        : { ...state, invited: [...state.invited, action.invitee] },
   );
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   const visibleCrew = crew.filter((c) => !optimistic.removedIds.includes(c.id));
 
+  function toggleRole(role: string) {
+    setRoles((prev) => (prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]));
+  }
+
   function handleAdd() {
     const trimmed = email.trim();
     if (!trimmed) return;
-    const roleTag = role;
+    const invitee = { email: trimmed, roleTags: roles };
     setEmail("");
-    setRole("");
+    setRoles([]);
     setAdding(false);
     startTransition(async () => {
-      applyOptimistic({ type: "invite", email: trimmed });
+      applyOptimistic({ type: "invite", invitee });
       try {
         const formData = new FormData();
         formData.set("email", trimmed);
-        if (roleTag) formData.set("role", roleTag);
+        invitee.roleTags.forEach((r) => formData.append("role", r));
         await addCrewMember(formData);
-        setInvitedEmails((prev) => [...prev, trimmed]);
+        setInvited((prev) => [...prev, invitee]);
       } catch {
         setError(`Couldn't invite ${trimmed}. Try again.`);
       }
@@ -67,7 +74,7 @@ export function CrewList({ crew }: { crew: CrewMember[] }) {
 
   return (
     <div>
-      {visibleCrew.length === 0 && optimistic.invitedEmails.length === 0 && (
+      {visibleCrew.length === 0 && optimistic.invited.length === 0 && (
         <p className="py-2.5 text-[12.5px] text-ink-soft">No crew yet. Invite people to join the film.</p>
       )}
 
@@ -92,40 +99,40 @@ export function CrewList({ crew }: { crew: CrewMember[] }) {
         </div>
       ))}
 
-      {optimistic.invitedEmails.map((invitedEmail) => (
-        <div key={invitedEmail} className="flex items-center gap-2.5 border-b border-hairline py-2.5">
-          <Avatar name={invitedEmail} />
-          <span className="flex-1 text-[13px] font-medium text-ink-soft">{invitedEmail}</span>
+      {optimistic.invited.map((invitee) => (
+        <div key={invitee.email} className="flex items-center gap-2.5 border-b border-hairline py-2.5">
+          <Avatar name={invitee.email} />
+          <div className="flex-1">
+            <p className="text-[13px] font-medium text-ink-soft">{invitee.email}</p>
+            {invitee.roleTags.length > 0 && (
+              <p className="text-[11px] text-ink-soft">{invitee.roleTags.join(", ")}</p>
+            )}
+          </div>
           <span className="text-[11px] text-ink-soft">Invited</span>
         </div>
       ))}
 
       {adding ? (
-        <div className="flex items-center gap-2.5 py-2.5">
-          <input
-            autoFocus
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-            placeholder="Email address"
-            className="flex-1 border-0 border-b-[1.5px] border-hairline bg-transparent py-1.5 text-[13px] placeholder:text-ink-faint focus:border-burgundy focus:outline-none"
-          />
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className="rounded border-0 bg-transparent text-[11px] font-semibold text-burgundy focus:outline-none"
-          >
-            <option value="">+ role</option>
+        <div className="flex flex-col gap-2 py-2.5">
+          <div className="flex items-center gap-2.5">
+            <input
+              autoFocus
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+              placeholder="Email address"
+              className="flex-1 border-0 border-b-[1.5px] border-hairline bg-transparent py-1.5 text-[13px] placeholder:text-ink-faint focus:border-burgundy focus:outline-none"
+            />
+            <button type="button" onClick={handleAdd} disabled={isPending} className="text-[12px] font-semibold text-burgundy">
+              Invite
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
             {ROLE_PRESETS.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
+              <RoleChip key={r} label={r} selected={roles.includes(r)} onToggle={() => toggleRole(r)} />
             ))}
-          </select>
-          <button type="button" onClick={handleAdd} disabled={isPending} className="text-[12px] font-semibold text-burgundy">
-            Invite
-          </button>
+          </div>
         </div>
       ) : (
         <button type="button" onClick={() => setAdding(true)} className="py-2.5 text-xs font-semibold text-burgundy">
