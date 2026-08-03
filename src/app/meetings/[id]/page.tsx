@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { toIsoDate } from "@/server/availability-rules";
 import { getMeetingDetail, getTentativeAvailabilityRatio } from "@/server/meeting-detail";
+import { getMembershipsForUser } from "@/server/memberships";
 
 import { MeetingDetailView } from "@/components/meetings/meeting-detail-view";
 
@@ -17,6 +18,10 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
 
   const organizationId = session.session.activeOrganizationId;
   if (!organizationId) redirect("/");
+
+  // Kicked off alongside the queries below, not awaited here, so NavShell's
+  // fetch overlaps with the rest of the page's data instead of running after it.
+  const membershipsPromise = getMembershipsForUser(session.user.id);
 
   const membership = await prisma.member.findUnique({
     where: { organizationId_userId: { organizationId, userId: session.user.id } },
@@ -77,7 +82,7 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
   };
 
   return (
-    <NavShell activeHref="/meetings" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={organizationId}>
+    <NavShell activeHref="/meetings" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={organizationId} memberships={membershipsPromise}>
       <MeetingDetailView meeting={data} isOrganiser={isOrganiser} />
     </NavShell>
   );

@@ -52,7 +52,7 @@ export default async function Home({
     }
 
     return (
-      <NavShell activeHref="/" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={activeOrganizationId}>
+      <NavShell activeHref="/" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={activeOrganizationId} memberships={{ active, wrapped }}>
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
           <FilmPicker
             active={active}
@@ -91,7 +91,7 @@ export default async function Home({
     const { tour } = await searchParams;
 
     return (
-      <NavShell activeHref="/" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={activeOrganizationId}>
+      <NavShell activeHref="/" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={activeOrganizationId} memberships={{ active, wrapped }}>
         <OrganiserDashboard filmName={film.name} upcoming={upcoming} />
         <AutoRefresh />
         {tour === "1" && <DashboardTour />}
@@ -112,7 +112,7 @@ export default async function Home({
   ].sort(byEarliestDate);
 
   return (
-    <NavShell activeHref="/" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={activeOrganizationId}>
+    <NavShell activeHref="/" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={activeOrganizationId} memberships={{ active, wrapped }}>
       <CrewToday filmName={film.name} upcoming={upcoming.slice(0, 5)} />
     </NavShell>
   );

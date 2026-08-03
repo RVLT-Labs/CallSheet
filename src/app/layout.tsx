@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Playfair_Display, Space_Mono } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const inter = Inter({
@@ -46,6 +48,8 @@ export default function RootLayout({
     >
       <body className="min-h-dvh flex flex-col bg-cream text-ink font-sans">
         {children}
+        <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );

@@ -6,6 +6,7 @@ import { NavShell } from "@/components/ui/nav-shell";
 import { FilmSettingsForm } from "@/components/settings/film-settings-form";
 import { auth } from "@/lib/auth";
 import { getFilmSettingsContext } from "@/server/film-settings";
+import { getMembershipsForUser } from "@/server/memberships";
 
 export default async function SettingsPage() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -13,6 +14,10 @@ export default async function SettingsPage() {
 
   const organizationId = session.session.activeOrganizationId;
   if (!organizationId) redirect("/");
+
+  // Kicked off alongside the query below, not awaited here, so NavShell's
+  // fetch overlaps with the rest of the page's data instead of running after it.
+  const membershipsPromise = getMembershipsForUser(session.user.id);
 
   const { film, isOrganiser, organisers, crew } = await getFilmSettingsContext(organizationId, session.user.id);
   if (!isOrganiser) redirect("/");
@@ -22,6 +27,7 @@ export default async function SettingsPage() {
       activeHref="/settings"
       user={{ id: session.user.id, name: session.user.name }}
       activeOrganizationId={organizationId}
+      memberships={membershipsPromise}
     >
       <CenteredCard wide>
         <h1 className="font-display mb-5 text-2xl font-bold italic text-burgundy">Crew & Settings</h1>

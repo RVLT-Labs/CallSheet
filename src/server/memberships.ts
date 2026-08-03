@@ -17,4 +17,5 @@ export async function getMembershipsForUser(userId: string) {
   };
 }
 
-export type Membership = Awaited<ReturnType<typeof getMembershipsForUser>>["active"][number];
+export type Memberships = Awaited<ReturnType<typeof getMembershipsForUser>>;
+export type Membership = Memberships["active"][number];
