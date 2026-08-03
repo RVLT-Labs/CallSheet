@@ -5,7 +5,7 @@ import { ensureInvitesForShoot } from "@/server/shoot-detail";
 import {
   rankCandidates,
   type CandidateSlot,
-  type HalfDayPreference,
+  type DayWindow,
   type PersonAvailability,
   type RankedCandidate,
 } from "@/server/scheduling-suggestions";
@@ -24,7 +24,7 @@ export type SuggestDatesInput = {
   required: SlotSelection;
   general: SlotSelection;
   numDays: number;
-  halfDayPreference: HalfDayPreference;
+  dayWindow: DayWindow;
   searchStart: string;
   searchEnd: string;
 };
@@ -42,6 +42,27 @@ function toSlots(selection: SlotSelection, crewById: Map<string, string>): Candi
   return [...memberSlots, ...placeholderSlots];
 }
 
+async function buildAvailabilityByMembership(
+  membershipIds: string[],
+  filmWindow: { start: Date; end: Date },
+): Promise<Map<string, PersonAvailability>> {
+  const calendarByMembership = await getAvailabilityCalendarDataBatch(membershipIds, filmWindow.start, filmWindow.end);
+
+  const availabilityByMembership = new Map<string, PersonAvailability>();
+  for (const membershipId of membershipIds) {
+    const days = calendarByMembership.get(membershipId)?.days ?? [];
+    const personAvailability: PersonAvailability = new Map();
+    for (const day of days) {
+      personAvailability.set(
+        day.dateIso,
+        day.blocks.map((b) => ({ startTime: b.startTime, endTime: b.endTime, blockType: b.blockType, label: b.label })),
+      );
+    }
+    availabilityByMembership.set(membershipId, personAvailability);
+  }
+  return availabilityByMembership;
+}
+
 export async function suggestShootDates(
   organizationId: string,
   filmWindow: { start: Date; end: Date },
@@ -51,21 +72,7 @@ export async function suggestShootDates(
   const crewById = new Map(crew.map((c) => [c.id, c.user.name]));
 
   const allMembershipIds = [...new Set([...input.required.membershipIds, ...input.general.membershipIds])];
-  const calendarByMembership = await getAvailabilityCalendarDataBatch(
-    allMembershipIds,
-    filmWindow.start,
-    filmWindow.end,
-  );
-
-  const availabilityByMembership = new Map<string, PersonAvailability>();
-  for (const membershipId of allMembershipIds) {
-    const days = calendarByMembership.get(membershipId)?.days ?? [];
-    const personAvailability: PersonAvailability = new Map();
-    for (const day of days) {
-      personAvailability.set(day.dateIso, { am: day.am?.tier ?? null, pm: day.pm?.tier ?? null });
-    }
-    availabilityByMembership.set(membershipId, personAvailability);
-  }
+  const availabilityByMembership = await buildAvailabilityByMembership(allMembershipIds, filmWindow);
 
   const searchStart = parseIsoDateUtc(input.searchStart);
   const searchEnd = parseIsoDateUtc(input.searchEnd);
@@ -74,7 +81,7 @@ export async function suggestShootDates(
     required: toSlots(input.required, crewById),
     general: toSlots(input.general, crewById),
     numDays: input.numDays,
-    halfDayPreference: input.halfDayPreference,
+    dayWindow: input.dayWindow,
     searchStart,
     searchEnd,
     availabilityByMembership,
@@ -86,28 +93,24 @@ export async function suggestShootDates(
 export type ConfirmShootInput = {
   status: "tentative" | "confirmed";
   dayIsos: string[];
-  halfDayPreference: HalfDayPreference;
+  dayWindow: DayWindow;
   defaultCallTime: string;
   required: SlotSelection;
   general: SlotSelection;
 };
 
 export async function createShoot(organizationId: string, input: ConfirmShootInput) {
-  const halfDaysPerDay: ("AM" | "PM")[] =
-    input.halfDayPreference === "EITHER" ? ["AM", "PM"] : [input.halfDayPreference];
-
   const shoot = await prisma.shoot.create({
     data: {
       filmId: organizationId,
       status: input.status,
       days: {
-        create: input.dayIsos.flatMap((dateIso) =>
-          halfDaysPerDay.map((halfDay) => ({
-            date: parseIsoDateUtc(dateIso),
-            halfDay,
-            defaultCallTime: input.defaultCallTime,
-          })),
-        ),
+        create: input.dayIsos.map((dateIso) => ({
+          date: parseIsoDateUtc(dateIso),
+          startTime: input.dayWindow.startTime,
+          estimatedEndTime: input.dayWindow.endTime,
+          defaultCallTime: input.defaultCallTime,
+        })),
       },
       slots: {
         create: [

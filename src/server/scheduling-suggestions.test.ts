@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { combineDayTier, rankCandidates, type CandidateInput, type PersonAvailability } from "@/server/scheduling-suggestions";
+import { dayStatus, rankCandidates, type AvailabilityBlockRef, type CandidateInput, type PersonAvailability } from "@/server/scheduling-suggestions";
 import { utcDate } from "@/server/availability-rules";
 
-function availability(entries: Record<string, { am?: string; pm?: string }>): PersonAvailability {
-  const map: PersonAvailability = new Map();
-  for (const [dateIso, tiers] of Object.entries(entries)) {
-    map.set(dateIso, { am: (tiers.am as never) ?? null, pm: (tiers.pm as never) ?? null });
-  }
-  return map;
+function block(overrides: Partial<AvailabilityBlockRef> = {}): AvailabilityBlockRef {
+  return { startTime: "09:00", endTime: "17:00", blockType: "hard", label: null, ...overrides };
+}
+
+function availability(entries: Record<string, AvailabilityBlockRef[]>): PersonAvailability {
+  return new Map(Object.entries(entries));
 }
 
 function baseInput(overrides: Partial<CandidateInput> = {}): CandidateInput {
@@ -16,7 +16,7 @@ function baseInput(overrides: Partial<CandidateInput> = {}): CandidateInput {
     required: [],
     general: [],
     numDays: 1,
-    halfDayPreference: "EITHER",
+    dayWindow: { startTime: "09:00", endTime: "17:00" },
     searchStart: utcDate(2026, 6, 1),
     searchEnd: utcDate(2026, 6, 7),
     availabilityByMembership: new Map(),
@@ -24,27 +24,28 @@ function baseInput(overrides: Partial<CandidateInput> = {}): CandidateInput {
   };
 }
 
-describe("combineDayTier", () => {
-  it("returns the requested half directly for AM/PM preference", () => {
-    expect(combineDayTier("best", "unavailable", "AM")).toBe("best");
-    expect(combineDayTier("best", "unavailable", "PM")).toBe("unavailable");
+describe("dayStatus", () => {
+  it("is clear when no block overlaps the window", () => {
+    expect(dayStatus([block({ startTime: "18:00", endTime: "20:00" })], { startTime: "09:00", endTime: "17:00" })).toBe(
+      "clear",
+    );
   });
 
-  it("EITHER is only as good as the worse half", () => {
-    expect(combineDayTier("best", "best", "EITHER")).toBe("best");
-    expect(combineDayTier("best", "ok", "EITHER")).toBe("ok");
-    expect(combineDayTier("best", "unavailable", "EITHER")).toBe("unavailable");
-    expect(combineDayTier(null, null, "EITHER")).toBeNull();
-    expect(combineDayTier("best", null, "EITHER")).toBe("best");
+  it("is hard when a hard block overlaps the window", () => {
+    expect(dayStatus([block({ blockType: "hard" })], { startTime: "09:00", endTime: "17:00" })).toBe("hard");
+  });
+
+  it("is flagged (never hard) when only a soft block overlaps the window", () => {
+    expect(dayStatus([block({ blockType: "soft" })], { startTime: "09:00", endTime: "17:00" })).toBe("flagged");
   });
 });
 
 describe("rankCandidates", () => {
-  it("never suggests a date where a required (real) person is unavailable on any day", () => {
+  it("never suggests a date where a required (real) person has a hard block overlapping the window", () => {
     const input = baseInput({
       required: [{ kind: "member", membershipId: "req1", name: "Req" }],
       availabilityByMembership: new Map([
-        ["req1", availability({ "2026-07-01": { am: "unavailable", pm: "unavailable" } })],
+        ["req1", availability({ "2026-07-01": [block({ blockType: "hard" })] })],
       ]),
     });
     const results = rankCandidates(input);
@@ -59,30 +60,28 @@ describe("rankCandidates", () => {
         [
           "req1",
           availability({
-            "2026-07-01": { am: "best", pm: "best" },
-            "2026-07-02": { am: "unavailable", pm: "unavailable" },
+            "2026-07-01": [],
+            "2026-07-02": [block({ blockType: "hard" })],
           }),
         ],
       ]),
     });
     const results = rankCandidates(input);
-    // The 2-day block starting 07-01 includes the unavailable 07-02 -> disqualified,
-    // even though the average of "best" + "unavailable" might look survivable.
     expect(results.some((r) => r.startDateIso === "2026-07-01")).toBe(false);
   });
 
-  it("never disqualifies a candidate based on general crew availability", () => {
+  it("never disqualifies a candidate based on general crew's hard block", () => {
     const input = baseInput({
       general: [{ kind: "member", membershipId: "gen1", name: "Gen" }],
       availabilityByMembership: new Map([
-        ["gen1", availability({ "2026-07-01": { am: "unavailable", pm: "unavailable" } })],
+        ["gen1", availability({ "2026-07-01": [block({ blockType: "hard" })] })],
       ]),
     });
     const results = rankCandidates(input);
     expect(results.some((r) => r.startDateIso === "2026-07-01")).toBe(true);
   });
 
-  it("ranks a date with a Best required person above one with an OK required person", () => {
+  it("a soft block on a required person never disqualifies, but flags the candidate and sorts it after fully-free dates", () => {
     const input = baseInput({
       searchStart: utcDate(2026, 6, 1),
       searchEnd: utcDate(2026, 6, 2),
@@ -91,14 +90,20 @@ describe("rankCandidates", () => {
         [
           "req1",
           availability({
-            "2026-07-01": { am: "best", pm: "best" },
-            "2026-07-02": { am: "ok", pm: "ok" },
+            "2026-07-01": [block({ blockType: "soft", label: "Waitressing shift" })],
+            "2026-07-02": [],
           }),
         ],
       ]),
     });
     const results = rankCandidates(input);
-    expect(results[0].startDateIso).toBe("2026-07-01");
+    expect(results).toHaveLength(2);
+    // Fully-free 07-02 sorts before flagged 07-01, even though it's later.
+    expect(results[0].startDateIso).toBe("2026-07-02");
+    expect(results[0].hasConflict).toBe(false);
+    expect(results[1].startDateIso).toBe("2026-07-01");
+    expect(results[1].hasConflict).toBe(true);
+    expect(results[1].breakdown[0].conflictLabel).toContain("Waitressing shift");
   });
 
   it("excludes placeholder slots from availability computation but includes them in the breakdown", () => {
@@ -112,11 +117,12 @@ describe("rankCandidates", () => {
     expect(results[0].breakdown[0]).toEqual({
       slot: { kind: "placeholder", label: "TBD Boom Op" },
       role: "required",
-      tier: null,
+      status: null,
+      conflictLabel: null,
     });
   });
 
-  it("treats unknown availability as a light penalty, not a disqualifier", () => {
+  it("treats a person with no availability data as fully available (default-available model)", () => {
     const input = baseInput({
       searchStart: utcDate(2026, 6, 1),
       searchEnd: utcDate(2026, 6, 1),
@@ -125,6 +131,7 @@ describe("rankCandidates", () => {
     });
     const results = rankCandidates(input);
     expect(results).toHaveLength(1);
-    expect(results[0].score).toBeGreaterThan(0);
+    expect(results[0].score).toBe(1);
+    expect(results[0].breakdown[0].status).toBe("clear");
   });
 });

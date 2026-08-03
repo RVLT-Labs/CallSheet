@@ -1,14 +1,18 @@
-// Pure date-ranking logic (spec §4.5), shared by shoot and meeting planning —
-// nothing in here is shoot- or meeting-specific. Kept free of Prisma/DB calls
-// so the hard-gate and worst-day rules are unit-testable without a database —
-// see scheduling-suggestions.test.ts.
+// Pure date-ranking logic (spec §4.5, pivoted to timed soft/hard blocks in
+// issue #70/#71), shared by shoot and meeting planning — nothing in here is
+// shoot- or meeting-specific. Kept free of Prisma/DB calls so the hard-gate
+// and worst-day rules are unit-testable without a database — see
+// scheduling-suggestions.test.ts.
 
 import { toIsoDate } from "@/server/availability-rules";
-import type { Tier } from "@/lib/availability-tiers";
+import { formatTimeRange, timeRangesOverlap } from "@/lib/time";
+import type { BlockType } from "@/lib/availability-blocks";
 
-export type HalfDayPreference = "AM" | "PM" | "EITHER";
+export type DayWindow = { startTime: string; endTime: string };
 
-export type PersonAvailability = Map<string, { am: Tier | null; pm: Tier | null }>; // dateIso -> tiers
+export type AvailabilityBlockRef = { startTime: string; endTime: string; blockType: BlockType; label: string | null };
+
+export type PersonAvailability = Map<string, AvailabilityBlockRef[]>; // dateIso -> blocks
 
 export type CrewMember = { membershipId: string; name: string };
 
@@ -20,55 +24,54 @@ export type CandidateInput = {
   required: CandidateSlot[];
   general: CandidateSlot[];
   numDays: number;
-  halfDayPreference: HalfDayPreference;
+  dayWindow: DayWindow; // the shoot/meeting's start/estimated-end time, applied to every day of the candidate block
   searchStart: Date;
   searchEnd: Date;
   availabilityByMembership: Map<string, PersonAvailability>;
 };
 
+/** "clear" = no overlapping block. "flagged" = a soft block overlaps (never disqualifies). "hard" = a hard block overlaps (disqualifies a required person). */
+export type DayStatus = "clear" | "flagged" | "hard";
+
+const STATUS_VALUE: Record<DayStatus, number> = { clear: 1, flagged: 0.6, hard: 0 };
+
+/** The single block responsible for a day's status — worst-severity match, used for the conflict note. */
+function overlappingBlock(blocks: AvailabilityBlockRef[], window: DayWindow, blockType: BlockType) {
+  return blocks.find(
+    (b) => b.blockType === blockType && timeRangesOverlap(window.startTime, window.endTime, b.startTime, b.endTime),
+  );
+}
+
+export function dayStatus(blocks: AvailabilityBlockRef[], window: DayWindow): DayStatus {
+  if (overlappingBlock(blocks, window, "hard")) return "hard";
+  if (overlappingBlock(blocks, window, "soft")) return "flagged";
+  return "clear";
+}
+
+export function conflictLabelFor(blocks: AvailabilityBlockRef[], window: DayWindow, status: DayStatus): string | null {
+  if (status === "clear") return null;
+  const block = overlappingBlock(blocks, window, status === "hard" ? "hard" : "soft");
+  if (!block) return null;
+  const timeLabel = formatTimeRange(block.startTime, block.endTime);
+  return block.label ? `${block.label}, ${timeLabel}` : timeLabel;
+}
+
 export type PersonBreakdown = {
   slot: CandidateSlot;
   role: "required" | "general";
-  tier: Tier | null; // combined day tier on the candidate's worst day, null for placeholders
+  status: DayStatus | null; // worst-day status across the candidate block, null for placeholders
+  conflictLabel: string | null; // human-readable detail for the worst flagged/hard day, e.g. "Waitressing shift, 7:00 PM–11:00 PM"
 };
 
 export type RankedCandidate = {
   startDateIso: string;
   dayIsos: string[];
   score: number;
+  hasConflict: boolean; // true when a required person has a soft-block conflict on any day — sorts after fully-free candidates, never disqualifies
   availableCount: number;
   totalCount: number;
   breakdown: PersonBreakdown[];
 };
-
-const TIER_VALUE: Record<Tier, number> = { best: 1, ok: 0.6, unavailable: 0 };
-const UNKNOWN_VALUE = 0.4; // "light penalty, never a red flag" (issue #8 scope)
-
-/**
- * Combines a day's AM/PM tiers into a single day-level tier per the chosen
- * half-day preference. For "EITHER" (a full working day), the day is only as
- * good as its worse half — the same worst-of philosophy the issue applies to
- * multi-day candidates, at the half-day level.
- */
-export function combineDayTier(
-  am: Tier | null,
-  pm: Tier | null,
-  preference: HalfDayPreference,
-): Tier | null {
-  if (preference === "AM") return am;
-  if (preference === "PM") return pm;
-
-  if (am === "unavailable" || pm === "unavailable") return "unavailable";
-  if (am === null && pm === null) return null;
-  if (am === "best" && pm === "best") return "best";
-  if (am === null) return pm;
-  if (pm === null) return am;
-  return "ok";
-}
-
-function dayValue(tier: Tier | null) {
-  return tier === null ? UNKNOWN_VALUE : TIER_VALUE[tier];
-}
 
 function candidateDayIsos(startDate: Date, numDays: number) {
   const isos: string[] = [];
@@ -76,6 +79,11 @@ function candidateDayIsos(startDate: Date, numDays: number) {
     isos.push(toIsoDate(new Date(startDate.getTime() + i * 86_400_000)));
   }
   return isos;
+}
+
+/** Worse-status-wins across a multi-day candidate block, mirroring the old worst-day rule. */
+function worstStatus(statuses: DayStatus[]): DayStatus {
+  return statuses.reduce((worst, s) => (STATUS_VALUE[s] < STATUS_VALUE[worst] ? s : worst), statuses[0]);
 }
 
 /** Evaluates one candidate block, or returns null if a required slot disqualifies it. */
@@ -86,89 +94,97 @@ function evaluateCandidate(
 ): RankedCandidate | null {
   const breakdown: PersonBreakdown[] = [];
 
-  const requiredTiersPerDay: number[][] = []; // [personIndex][dayIndex]
+  const requiredValuesPerPerson: number[] = [];
   for (const slot of input.required) {
     if (slot.kind === "placeholder") {
-      breakdown.push({ slot, role: "required", tier: null });
+      breakdown.push({ slot, role: "required", status: null, conflictLabel: null });
       continue;
     }
     const availability = input.availabilityByMembership.get(slot.membershipId);
-    const dayTiers = dayIsos.map((dateIso) => {
-      const day = availability?.get(dateIso);
-      return combineDayTier(day?.am ?? null, day?.pm ?? null, input.halfDayPreference);
-    });
+    const dayStatuses = dayIsos.map((dateIso) => dayStatus(availability?.get(dateIso) ?? [], input.dayWindow));
 
-    // Hard gate: a required (real) person Unavailable on ANY day disqualifies
-    // the whole candidate, no exceptions (issue #8 acceptance criteria).
-    if (dayTiers.some((t) => t === "unavailable")) return null;
+    // Hard gate: a required (real) person with a hard block overlapping the
+    // window on ANY day disqualifies the whole candidate, no exceptions
+    // (issue #8 acceptance criteria, unchanged in spirit for #71).
+    if (dayStatuses.some((s) => s === "hard")) return null;
 
-    // Worst-day rule for the displayed/scored tier — a multi-day shoot is
-    // only as good as its worst day for a required person.
-    const worstTier = dayTiers.reduce<Tier | null>((worst, t) => {
-      if (dayValue(t) < dayValue(worst)) return t;
-      return worst;
-    }, dayTiers[0]);
+    const worst = worstStatus(dayStatuses);
+    const worstDayIndex = dayStatuses.findIndex((s) => s === worst);
+    const conflictLabel = conflictLabelFor(
+      availability?.get(dayIsos[worstDayIndex]) ?? [],
+      input.dayWindow,
+      worst,
+    );
 
-    breakdown.push({ slot, role: "required", tier: worstTier });
-    requiredTiersPerDay.push(dayTiers.map(dayValue));
+    breakdown.push({ slot, role: "required", status: worst, conflictLabel });
+    requiredValuesPerPerson.push(
+      dayStatuses.reduce((sum, s) => sum + STATUS_VALUE[s], 0) / dayStatuses.length,
+    );
   }
 
-  const generalRatiosPerDay: number[] = dayIsos.map(() => 0);
+  const generalAvailableRatiosPerDay: number[] = dayIsos.map(() => 0);
   let generalRealCount = 0;
   for (const slot of input.general) {
     if (slot.kind === "placeholder") {
-      breakdown.push({ slot, role: "general", tier: null });
+      breakdown.push({ slot, role: "general", status: null, conflictLabel: null });
       continue;
     }
     generalRealCount++;
     const availability = input.availabilityByMembership.get(slot.membershipId);
-    const dayTiers = dayIsos.map((dateIso) => {
-      const day = availability?.get(dateIso);
-      return combineDayTier(day?.am ?? null, day?.pm ?? null, input.halfDayPreference);
-    });
-    dayTiers.forEach((t, i) => {
-      if (t === "best" || t === "ok") generalRatiosPerDay[i] += 1;
+    const dayStatuses = dayIsos.map((dateIso) => dayStatus(availability?.get(dateIso) ?? [], input.dayWindow));
+    dayStatuses.forEach((s, i) => {
+      if (s !== "hard") generalAvailableRatiosPerDay[i] += 1;
     });
 
-    const worstTier = dayTiers.reduce<Tier | null>((worst, t) => {
-      if (dayValue(t) < dayValue(worst)) return t;
-      return worst;
-    }, dayTiers[0]);
-    breakdown.push({ slot, role: "general", tier: worstTier });
+    const worst = worstStatus(dayStatuses);
+    const worstDayIndex = dayStatuses.findIndex((s) => s === worst);
+    const conflictLabel = conflictLabelFor(
+      availability?.get(dayIsos[worstDayIndex]) ?? [],
+      input.dayWindow,
+      worst,
+    );
+    breakdown.push({ slot, role: "general", status: worst, conflictLabel });
   }
 
-  // Score: required people's average tier value across days, plus general
-  // crew's "available" ratio (Best+OK / total), averaged across days.
+  // Score: required people's average status value across days, plus general
+  // crew's "not hard-blocked" ratio, averaged across days.
   const requiredComponent =
-    requiredTiersPerDay.length === 0
+    requiredValuesPerPerson.length === 0
       ? 1
-      : requiredTiersPerDay.reduce((sum, dayValues) => sum + dayValues.reduce((a, b) => a + b, 0) / dayValues.length, 0) /
-        requiredTiersPerDay.length;
+      : requiredValuesPerPerson.reduce((a, b) => a + b, 0) / requiredValuesPerPerson.length;
 
   const generalComponent =
     generalRealCount === 0
       ? 1
-      : generalRatiosPerDay.reduce((sum, count) => sum + count / generalRealCount, 0) / generalRatiosPerDay.length;
+      : generalAvailableRatiosPerDay.reduce((sum, count) => sum + count / generalRealCount, 0) /
+        generalAvailableRatiosPerDay.length;
 
   const score = requiredComponent * 0.6 + generalComponent * 0.4;
 
+  // A required person flagged (soft-block conflict) on their worst day marks
+  // the whole candidate as "has a conflict" — never disqualifies, but sorts
+  // after fully-free candidates (issue #71: "show fully-free dates first,
+  // and flag them").
+  const hasConflict = breakdown.some((b) => b.role === "required" && b.status === "flagged");
+
   // Display ratio: how many of the real people (required + general) are
-  // Best/OK on every day of the block — an intuitive "8/10", separate from
-  // the underlying weighted score used to sort candidates.
-  const realPeople = breakdown.filter((b) => b.tier !== null);
-  const availableCount = realPeople.filter((b) => b.tier === "best" || b.tier === "ok").length;
+  // clear/flagged (i.e. not hard-blocked) on their worst day — an intuitive
+  // "8/10", separate from the underlying weighted score used to sort candidates.
+  const realPeople = breakdown.filter((b) => b.status !== null);
+  const availableCount = realPeople.filter((b) => b.status !== "hard").length;
 
   return {
     startDateIso: toIsoDate(startDate),
     dayIsos,
     score,
+    hasConflict,
     availableCount,
     totalCount: realPeople.length,
     breakdown,
   };
 }
 
-/** Ranks every candidate start-date within the search window, best first. */
+/** Ranks every candidate start-date within the search window, fully-free first, then best score first. */
 export function rankCandidates(input: CandidateInput): RankedCandidate[] {
   const candidates: RankedCandidate[] = [];
   const lastPossibleStart = new Date(input.searchEnd.getTime() - (input.numDays - 1) * 86_400_000);
@@ -183,5 +199,10 @@ export function rankCandidates(input: CandidateInput): RankedCandidate[] {
     if (result) candidates.push(result);
   }
 
-  return candidates.sort((a, b) => b.score - a.score || a.startDateIso.localeCompare(b.startDateIso));
+  return candidates.sort(
+    (a, b) =>
+      Number(a.hasConflict) - Number(b.hasConflict) ||
+      b.score - a.score ||
+      a.startDateIso.localeCompare(b.startDateIso),
+  );
 }

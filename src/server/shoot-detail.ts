@@ -1,10 +1,9 @@
 import { randomBytes } from "crypto";
 
 import { prisma } from "@/lib/prisma";
-import type { Tier } from "@/lib/availability-tiers";
-import { HALF_DAY_LABEL } from "@/lib/half-day";
 import { getAvailabilityCalendarDataBatch } from "@/server/availability";
 import { toIsoDate } from "@/server/availability-rules";
+import { dayStatus } from "@/server/scheduling-suggestions";
 import { removalOutcomeForInvite, shouldNotifyConfirmedEventChange, type InviteStatus } from "@/server/invite-roster";
 import { notifyConfirmedShootChange, sendInviteEmail, sendReminderEmail } from "@/server/shoot-invite-email";
 import type { ChangeField } from "@/lib/email-templates";
@@ -13,7 +12,7 @@ export async function getShootDetail(shootId: string, organizationId: string) {
   const shoot = await prisma.shoot.findFirst({
     where: { id: shootId, filmId: organizationId },
     include: {
-      days: { orderBy: [{ date: "asc" }, { halfDay: "asc" }] },
+      days: { orderBy: { date: "asc" } },
       slots: {
         include: { membership: { include: { user: { select: { name: true, email: true } } } } },
         orderBy: { id: "asc" },
@@ -134,7 +133,7 @@ export async function updateShootDetails(shootId: string, organizationId: string
       if (!day || day.defaultCallTime === defaultCallTime) continue;
 
       changes.push({
-        label: `${toIsoDate(day.date)} ${HALF_DAY_LABEL[day.halfDay]} call time`,
+        label: `${toIsoDate(day.date)} call time`,
         oldValue: day.defaultCallTime,
         newValue: defaultCallTime,
       });
@@ -220,23 +219,16 @@ export async function setCallTimeOverride(inviteId: string, shootDayId: string, 
   });
 }
 
-// Same value scale as shoot-suggestions.ts's worst-day rule (issue #8) — unknown
-// is a light penalty between OK and Unavailable, never treated as a red flag.
-const TIER_VALUE: Record<Tier, number> = { best: 1, ok: 0.6, unavailable: 0 };
-const UNKNOWN_VALUE = 0.4;
-
-function tierValue(tier: Tier | null) {
-  return tier === null ? UNKNOWN_VALUE : TIER_VALUE[tier];
-}
-
 /**
  * Availability ratio only, no roster — a Tentative shoot has no invites yet
  * (issue #9 acceptance criteria). Mirrors the suggestion algorithm's
- * worst-day rule (#8) for a person spanning multiple days of this shoot.
+ * worst-day rule for a person spanning multiple days of this shoot: a hard
+ * block overlapping any day means "not available" for the ratio; a soft
+ * block or no block at all still counts as available.
  */
 export async function getTentativeAvailabilityRatio(shoot: {
   id: string;
-  days: { date: Date; halfDay: "AM" | "PM" }[];
+  days: { date: Date; startTime: string; estimatedEndTime: string }[];
   slots: { membershipId: string | null; removedAt: Date | null }[];
 }) {
   const membershipIds = [...new Set(shoot.slots.filter((s) => s.membershipId && !s.removedAt).map((s) => s.membershipId!))];
@@ -253,18 +245,12 @@ export async function getTentativeAvailabilityRatio(shoot: {
     const days = calendarByMembership.get(membershipId)?.days ?? [];
     const byDate = new Map(days.map((d) => [d.dateIso, d]));
 
-    let worstTier: Tier | null = null;
-    let worstValue = Infinity;
-    for (const shootDay of shoot.days) {
+    const isAvailable = shoot.days.every((shootDay) => {
       const cell = byDate.get(toIsoDate(shootDay.date));
-      const tier = shootDay.halfDay === "AM" ? (cell?.am?.tier ?? null) : (cell?.pm?.tier ?? null);
-      const value = tierValue(tier);
-      if (value < worstValue) {
-        worstValue = value;
-        worstTier = tier;
-      }
-    }
-    if (worstTier === "best" || worstTier === "ok") availableCount++;
+      const status = dayStatus(cell?.blocks ?? [], { startTime: shootDay.startTime, endTime: shootDay.estimatedEndTime });
+      return status !== "hard";
+    });
+    if (isAvailable) availableCount++;
   }
 
   return { availableCount, totalCount: membershipIds.length };

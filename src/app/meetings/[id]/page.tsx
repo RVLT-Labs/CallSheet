@@ -55,8 +55,8 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
     days: meeting.days.map((d) => ({
       id: d.id,
       dateIso: toIsoDate(d.date),
-      halfDay: d.halfDay,
       defaultStartTime: d.defaultStartTime,
+      estimatedEndTime: d.estimatedEndTime,
     })),
     activeSlots: activeSlots.map((s) => ({
       id: s.id,

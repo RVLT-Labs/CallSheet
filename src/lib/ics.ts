@@ -1,17 +1,23 @@
 import { createEvents, type EventAttributes } from "ics";
 
-// A shoot/meeting day has no fixed wrap time in the data model (only a start
-// time), so the .ics block uses a flat 8-hour duration as a calendar-hint
-// default — real wrap time varies and isn't tracked, so this is a deliberate
-// approximation, not a business rule.
-const DEFAULT_DURATION_HOURS = 8;
+import { timeToMinutes } from "@/lib/time";
+
+// Fallback only for the (should-never-happen) case an event's end time is
+// before/equal to its start — a flat calendar-hint duration rather than a
+// zero/negative-length event.
+const FALLBACK_DURATION_HOURS = 8;
 
 export type IcsEventDay = {
   id: string;
   dateIso: string; // YYYY-MM-DD
-  halfDay: "AM" | "PM";
   startTime: string; // "HH:mm", already resolved to this person's effective time (override or default)
+  estimatedEndTime: string; // "HH:mm"
 };
+
+function durationMinutes(startTime: string, endTime: string) {
+  const minutes = timeToMinutes(endTime) - timeToMinutes(startTime);
+  return minutes > 0 ? minutes : FALLBACK_DURATION_HOURS * 60;
+}
 
 export type BuildInviteIcsInput = {
   eventTitle: string;
@@ -45,7 +51,7 @@ export function buildInviteIcs(input: BuildInviteIcsInput): { filename: string; 
     sequence: input.icsSequence,
     title: input.eventTitle,
     start: toDateArray(day.dateIso, day.startTime),
-    duration: { hours: DEFAULT_DURATION_HOURS },
+    duration: { minutes: durationMinutes(day.startTime, day.estimatedEndTime) },
     location: input.locationAddress ?? undefined,
     geo:
       input.locationLat != null && input.locationLng != null

@@ -1,7 +1,7 @@
 import { cn } from "@/lib/cn";
-import { TIER_BG, type Tier } from "@/lib/availability-tiers";
+import { BLOCK_TYPE_BG, type BlockType } from "@/lib/availability-blocks";
 
-export type HalfDayState = { tier: Tier; source: "manual" | "recurring"; ruleLabel: string | null } | null;
+export type DayCellBlockSummary = { blockType: BlockType; source: "manual" | "recurring" };
 
 export type CalendarCell = {
   dateIso: string;
@@ -11,41 +11,34 @@ export type CalendarCell = {
 
 type DayCellProps = {
   cell: CalendarCell;
-  am: HalfDayState;
-  pm: HalfDayState;
+  blocks: DayCellBlockSummary[];
   isSelected: boolean;
   isToday: boolean;
-  isTouched: boolean;
-  onPointerDown: (dateIso: string, shiftKey: boolean) => void;
-  onPointerEnter: (dateIso: string) => void;
+  onSelect: (dateIso: string) => void;
 };
 
 /**
- * One calendar date, a single click-or-drag target (design system §4.3).
- * Laid out like an ordinary month-view calendar cell — date number in the
- * corner, most of the box empty — with the AM/PM tier shown as a pair of
- * small chips along the bottom rather than dominating the cell. Tapping or
- * dragging picks the whole day; which half to set is chosen afterward in
- * the detail panel, not by hitting an AM/PM chip directly.
+ * One calendar date (design system §4.3). Date number in the corner, a
+ * small bar along the bottom shows hard/soft blocks for the day — solid
+ * burgundy for any hard block, terracotta for soft, dashed outline for a
+ * fully free day. A faint dot marks a day still governed by a recurring rule.
  */
-export function DayCell({ cell, am, pm, isSelected, isToday, isTouched, onPointerDown, onPointerEnter }: DayCellProps) {
+export function DayCell({ cell, blocks, isSelected, isToday, onSelect }: DayCellProps) {
   if (!cell) return <div className="border-b border-r border-hairline" />;
 
-  const ruleDerived = am?.source === "recurring" || pm?.source === "recurring";
+  const hasHard = blocks.some((b) => b.blockType === "hard");
+  const hasSoft = blocks.some((b) => b.blockType === "soft");
+  const ruleDerived = blocks.some((b) => b.source === "recurring");
 
   return (
-    <div
+    <button
+      type="button"
       data-date={cell.dateIso}
-      data-in-window={cell.inWindow || undefined}
-      role="button"
-      aria-label={`${cell.dateIso}${cell.inWindow ? ", set availability" : ""}`}
-      onPointerDown={(e) => {
-        if (!cell.inWindow) return;
-        onPointerDown(cell.dateIso, e.shiftKey);
-      }}
-      onPointerEnter={() => cell.inWindow && onPointerEnter(cell.dateIso)}
+      disabled={!cell.inWindow}
+      aria-label={`${cell.dateIso}${cell.inWindow ? ", edit availability" : ""}`}
+      onClick={() => cell.inWindow && onSelect(cell.dateIso)}
       className={cn(
-        "flex min-h-[68px] flex-col gap-2 border-b border-r border-hairline p-1.5 sm:min-h-[86px] sm:p-2",
+        "flex min-h-[68px] flex-col gap-2 border-b border-r border-hairline p-1.5 text-left sm:min-h-[86px] sm:p-2",
         isSelected && "bg-cream-deep",
         !cell.inWindow && "opacity-35",
       )}
@@ -61,25 +54,16 @@ export function DayCell({ cell, am, pm, isSelected, isToday, isTouched, onPointe
         </span>
         <span className={cn("h-1.5 w-1.5 rounded-full", ruleDerived ? "bg-ink-faint" : "bg-transparent")} aria-hidden />
       </div>
-      <div
-        className={cn(
-          "mt-auto flex gap-1 rounded-[5px]",
-          isTouched && "-m-1 ring-2 ring-inset ring-ink p-1",
+      <div className="mt-auto flex gap-1 rounded-[5px]">
+        {!hasHard && !hasSoft ? (
+          <div className="h-2.5 flex-1 rounded-[3px] border border-dashed border-hairline" />
+        ) : (
+          <>
+            {hasHard && <div className={cn("h-2.5 flex-1 rounded-[3px]", BLOCK_TYPE_BG.hard)} />}
+            {hasSoft && <div className={cn("h-2.5 flex-1 rounded-[3px]", BLOCK_TYPE_BG.soft)} />}
+          </>
         )}
-      >
-        <div
-          className={cn(
-            "h-2.5 flex-1 rounded-[3px]",
-            am ? TIER_BG[am.tier] : "border border-dashed border-hairline",
-          )}
-        />
-        <div
-          className={cn(
-            "h-2.5 flex-1 rounded-[3px]",
-            pm ? TIER_BG[pm.tier] : "border border-dashed border-hairline",
-          )}
-        />
       </div>
-    </div>
+    </button>
   );
 }

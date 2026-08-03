@@ -3,36 +3,59 @@
 import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
-import type { Tier } from "@/lib/availability-tiers";
+import type { BlockType } from "@/lib/availability-blocks";
 import {
+  clearDateToFree,
+  createManualBlock,
+  createManualBlockBulk,
+  deleteManualBlock,
   requireActiveMembership,
   resolveAndPersistAvailabilityWindow,
-  setAvailabilityBulk,
-  setAvailabilityTier,
+  updateManualBlock,
+  type BlockInput,
 } from "@/server/availability";
-import { parseIsoDateUtc, type HalfDay } from "@/server/availability-rules";
+import { parseIsoDateUtc } from "@/server/availability-rules";
 
 function filmWindow(film: { dateRangeStart: Date | null; dateRangeEnd: Date | null }) {
   if (!film.dateRangeStart || !film.dateRangeEnd) throw new Error("Film has no working date range set");
   return { windowStart: film.dateRangeStart, windowEnd: film.dateRangeEnd };
 }
 
-export async function setDayTier(dateIso: string, halfDay: HalfDay, tier: Tier) {
+export async function addBlock(dateIso: string, input: BlockInput) {
   const { membershipId } = await requireActiveMembership();
-  await setAvailabilityTier(membershipId, dateIso, halfDay, tier);
+  await createManualBlock(membershipId, dateIso, input);
   revalidatePath("/availability");
 }
 
-export async function setBulkTier(cells: { dateIso: string; halfDay: HalfDay }[], tier: Tier) {
+export async function addBlockBulk(dateIsos: string[], input: BlockInput) {
   const { membershipId } = await requireActiveMembership();
-  await setAvailabilityBulk(membershipId, cells, tier);
+  await createManualBlockBulk(membershipId, dateIsos, input);
+  revalidatePath("/availability");
+}
+
+export async function editBlock(blockId: string, input: BlockInput) {
+  const { membershipId } = await requireActiveMembership();
+  await updateManualBlock(blockId, membershipId, input);
+  revalidatePath("/availability");
+}
+
+export async function removeBlock(blockId: string) {
+  const { membershipId } = await requireActiveMembership();
+  await deleteManualBlock(blockId, membershipId);
+  revalidatePath("/availability");
+}
+
+export async function clearDay(dateIso: string) {
+  const { membershipId } = await requireActiveMembership();
+  await clearDateToFree(membershipId, dateIso);
   revalidatePath("/availability");
 }
 
 export type RecurringRuleInput = {
   daysOfWeek: number[];
-  halfDay: HalfDay | null;
-  tier: Tier;
+  startTime: string;
+  endTime: string;
+  blockType: BlockType;
   label: string;
   effectiveStart: string;
   effectiveEnd: string;
@@ -51,8 +74,9 @@ export async function createRecurringRule(input: RecurringRuleInput) {
     data: input.daysOfWeek.map((dayOfWeek) => ({
       membershipId,
       dayOfWeek,
-      halfDay: input.halfDay,
-      tier: input.tier,
+      startTime: input.startTime,
+      endTime: input.endTime,
+      blockType: input.blockType,
       label: input.label.trim() || null,
       effectiveStart,
       effectiveEnd,
@@ -80,8 +104,9 @@ export async function updateRecurringRule(
     where: { id: ruleId },
     data: {
       dayOfWeek: input.dayOfWeek,
-      halfDay: input.halfDay,
-      tier: input.tier,
+      startTime: input.startTime,
+      endTime: input.endTime,
+      blockType: input.blockType,
       label: input.label.trim() || null,
       effectiveStart,
       effectiveEnd,

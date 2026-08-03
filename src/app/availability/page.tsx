@@ -74,8 +74,9 @@ export default async function AvailabilityPage() {
           rules={rules.map((r) => ({
             id: r.id,
             dayOfWeek: r.dayOfWeek,
-            halfDay: r.halfDay,
-            tier: r.tier,
+            startTime: r.startTime,
+            endTime: r.endTime,
+            blockType: r.blockType,
             label: r.label,
             effectiveStart: r.effectiveStart.toISOString().slice(0, 10),
             effectiveEnd: r.effectiveEnd ? r.effectiveEnd.toISOString().slice(0, 10) : null,

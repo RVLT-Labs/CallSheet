@@ -49,8 +49,8 @@ function button(label: string, url: string, variant: "primary" | "secondary") {
   return `<a href="${url}" style="display:inline-block;padding:12px 22px;border-radius:6px;font-family:${BODY_FONT};font-size:13.5px;font-weight:bold;text-decoration:none;${styles}">${label}</a>`;
 }
 
-function dateLineHtml(dateLabel: string, halfDayLabel: string, timeLabel: string, time: string) {
-  return `<p style="margin:0 0 4px 0;font-family:${BODY_FONT};font-size:13.5px;color:${COLOR.ink};">${dateLabel} · ${halfDayLabel} · ${timeLabel} ${time}</p>`;
+function dateLineHtml(dateLabel: string, timeLabel: string, time: string) {
+  return `<p style="margin:0 0 4px 0;font-family:${BODY_FONT};font-size:13.5px;color:${COLOR.ink};">${dateLabel} · ${timeLabel} ${time}</p>`;
 }
 
 // Shoots use "Call" (call time, film-crew jargon); meetings use "Start" — same
@@ -84,7 +84,7 @@ function avatarHtml(name: string) {
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;"><tr><td width="52" height="52" align="center" valign="middle" style="width:52px;height:52px;border-radius:26px;background-color:${avatarColorFor(name)};font-family:${BODY_FONT};font-size:18px;font-weight:bold;color:${COLOR.white};">${initialsFor(name)}</td></tr></table>`;
 }
 
-export type InviteEmailDay = { dateLabel: string; halfDayLabel: string; time: string };
+export type InviteEmailDay = { dateLabel: string; time: string };
 
 export function renderInviteEmail(params: {
   kind: EventKind;
@@ -99,7 +99,7 @@ export function renderInviteEmail(params: {
   const { kind, recipientName, eventTitle, days, locationAddress, locationNotes, acceptUrl, declineUrl } = params;
   const timeLabel = TIME_LABEL[kind];
 
-  const daysHtml = days.map((d) => dateLineHtml(d.dateLabel, d.halfDayLabel, timeLabel, d.time)).join("");
+  const daysHtml = days.map((d) => dateLineHtml(d.dateLabel, timeLabel, d.time)).join("");
   const locationHtml = locationAddress
     ? `<p style="margin:16px 0 0 0;font-family:${BODY_FONT};font-size:13.5px;color:${COLOR.inkSoft};">${locationAddress}</p>`
     : "";
@@ -124,7 +124,7 @@ export function renderInviteEmail(params: {
   const text = [
     `Hi ${recipientName},`,
     `You're invited to ${eventTitle}.`,
-    ...days.map((d) => `${d.dateLabel} - ${d.halfDayLabel} - ${timeLabel} ${d.time}`),
+    ...days.map((d) => `${d.dateLabel} - ${timeLabel} ${d.time}`),
     locationAddress ?? "",
     locationNotes ?? "",
     `Accept: ${acceptUrl}`,

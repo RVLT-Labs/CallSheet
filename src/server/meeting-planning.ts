@@ -6,7 +6,7 @@ import { ensureInvitesForMeeting } from "@/server/meeting-detail";
 import {
   rankCandidates,
   type CandidateSlot,
-  type HalfDayPreference,
+  type DayWindow,
   type PersonAvailability,
   type RankedCandidate,
 } from "@/server/scheduling-suggestions";
@@ -17,7 +17,7 @@ export type SuggestDatesInput = {
   required: SlotSelection;
   general: SlotSelection;
   numDays: number;
-  halfDayPreference: HalfDayPreference;
+  dayWindow: DayWindow;
   searchStart: string;
   searchEnd: string;
 };
@@ -55,7 +55,10 @@ export async function suggestMeetingDates(
     const days = calendarByMembership.get(membershipId)?.days ?? [];
     const personAvailability: PersonAvailability = new Map();
     for (const day of days) {
-      personAvailability.set(day.dateIso, { am: day.am?.tier ?? null, pm: day.pm?.tier ?? null });
+      personAvailability.set(
+        day.dateIso,
+        day.blocks.map((b) => ({ startTime: b.startTime, endTime: b.endTime, blockType: b.blockType, label: b.label })),
+      );
     }
     availabilityByMembership.set(membershipId, personAvailability);
   }
@@ -67,7 +70,7 @@ export async function suggestMeetingDates(
     required: toSlots(input.required, crewById),
     general: toSlots(input.general, crewById),
     numDays: input.numDays,
-    halfDayPreference: input.halfDayPreference,
+    dayWindow: input.dayWindow,
     searchStart,
     searchEnd,
     availabilityByMembership,
@@ -79,28 +82,22 @@ export async function suggestMeetingDates(
 export type ConfirmMeetingInput = {
   status: "tentative" | "confirmed";
   dayIsos: string[];
-  halfDayPreference: HalfDayPreference;
-  defaultStartTime: string;
+  dayWindow: DayWindow;
   required: SlotSelection;
   general: SlotSelection;
 };
 
 export async function createMeeting(organizationId: string, input: ConfirmMeetingInput) {
-  const halfDaysPerDay: ("AM" | "PM")[] =
-    input.halfDayPreference === "EITHER" ? ["AM", "PM"] : [input.halfDayPreference];
-
   const meeting = await prisma.meeting.create({
     data: {
       filmId: organizationId,
       status: input.status,
       days: {
-        create: input.dayIsos.flatMap((dateIso) =>
-          halfDaysPerDay.map((halfDay) => ({
-            date: parseIsoDateUtc(dateIso),
-            halfDay,
-            defaultStartTime: input.defaultStartTime,
-          })),
-        ),
+        create: input.dayIsos.map((dateIso) => ({
+          date: parseIsoDateUtc(dateIso),
+          defaultStartTime: input.dayWindow.startTime,
+          estimatedEndTime: input.dayWindow.endTime,
+        })),
       },
       slots: {
         create: [
