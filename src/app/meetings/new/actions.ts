@@ -1,7 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
-
 import {
   createMeeting,
   suggestMeetingDates,
@@ -24,5 +22,10 @@ export async function suggestDates(input: SuggestDatesInput) {
 export async function confirmMeeting(input: ConfirmMeetingInput) {
   const { organizationId } = await requireActiveOrganiserFilm();
   const meeting = await createMeeting(organizationId, input);
-  redirect(`/meetings?created=${meeting.id}`);
+  // Return the id rather than redirect() here — this is called directly from
+  // a client event handler (not a <form action>), and redirect()'s internal
+  // throw would otherwise land in the caller's try/catch as a fake error
+  // (surfaced to the user as the literal text "NEXT_REDIRECT"). The caller
+  // navigates itself with router.push once this resolves successfully.
+  return { id: meeting.id };
 }

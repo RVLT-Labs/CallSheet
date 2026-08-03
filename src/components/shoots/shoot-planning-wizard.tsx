@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { ListRow } from "@/components/ui/list-row";
@@ -51,6 +52,7 @@ export function ShootPlanningWizard({
   windowStart: string;
   windowEnd: string;
 }) {
+  const router = useRouter();
   const [step, setStep] = useState<Step>(1);
   const [crewSearch, setCrewSearch] = useState("");
 
@@ -123,7 +125,7 @@ export function ShootPlanningWizard({
     setConfirming(true);
     setConfirmError(null);
     try {
-      await confirmShoot({
+      const shoot = await confirmShoot({
         status,
         dayIsos: candidate.dayIsos,
         halfDayPreference,
@@ -131,8 +133,8 @@ export function ShootPlanningWizard({
         required: { membershipIds: requiredMembershipIds, placeholderLabels: requiredPlaceholders },
         general: { membershipIds: generalMembershipIds, placeholderLabels: generalPlaceholders },
       });
+      router.push(`/shoots?created=${shoot.id}`);
     } catch (e) {
-      // redirect() throws internally on success — only a real error lands here.
       setConfirmError(e instanceof Error ? e.message : "Could not create the shoot.");
       setConfirming(false);
     }
