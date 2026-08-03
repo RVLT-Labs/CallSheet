@@ -54,6 +54,7 @@ Build tracking lives in GitHub Issues — see [#23](https://github.com/RVLT-Labs
 |---|---|
 | `pnpm dev` | Start the dev server |
 | `pnpm build` | Production build |
+| `pnpm vercel-build` | What Vercel actually runs: applies pending migrations (`prisma migrate deploy`), then builds — keeps the production database schema in sync with `prisma/migrations` on every deploy |
 | `pnpm lint` | ESLint |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm db:migrate` | Create/apply a dev migration (`prisma migrate dev`) |
