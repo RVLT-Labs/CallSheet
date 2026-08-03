@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getAvailabilityCalendarData, type DayCell } from "@/server/availability";
+import { getAvailabilityCalendarDataBatch, type DayCell } from "@/server/availability";
 
 export type CrewAvailabilityRow = {
   membershipId: string;
@@ -24,10 +24,16 @@ export async function getAggregateAvailability(
     orderBy: { user: { name: "asc" } },
   });
 
-  return Promise.all(
-    members.map(async (member) => {
-      const { days } = await getAvailabilityCalendarData(member.id, windowStart, windowEnd);
-      return { membershipId: member.id, name: member.user.name, roleTags: member.roleTags, days };
-    }),
+  const calendarByMembership = await getAvailabilityCalendarDataBatch(
+    members.map((m) => m.id),
+    windowStart,
+    windowEnd,
   );
+
+  return members.map((member) => ({
+    membershipId: member.id,
+    name: member.user.name,
+    roleTags: member.roleTags,
+    days: calendarByMembership.get(member.id)?.days ?? [],
+  }));
 }

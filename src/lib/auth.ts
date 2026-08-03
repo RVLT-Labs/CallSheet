@@ -35,6 +35,16 @@ export const auth = betterAuth({
     },
   },
 
+  // Without this, auth.api.getSession() hits the Session table on every
+  // server-rendered page/action — a signed, short-lived cookie cache avoids
+  // that DB round trip for most requests while still re-validating every 5m.
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60,
+    },
+  },
+
   plugins: [
     emailOTP({
       // Only used for sign-in (and, transitively, first-time sign-up — the app

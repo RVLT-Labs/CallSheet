@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getAvailabilityCalendarData } from "@/server/availability";
+import { getAvailabilityCalendarDataBatch } from "@/server/availability";
 import { parseIsoDateUtc } from "@/server/availability-rules";
 import { getFilmCrew } from "@/server/shoot-planning";
 import { ensureInvitesForMeeting } from "@/server/meeting-detail";
@@ -44,18 +44,21 @@ export async function suggestMeetingDates(
   const crewById = new Map(crew.map((c) => [c.id, c.user.name]));
 
   const allMembershipIds = [...new Set([...input.required.membershipIds, ...input.general.membershipIds])];
-  const availabilityByMembership = new Map<string, PersonAvailability>();
-
-  await Promise.all(
-    allMembershipIds.map(async (membershipId) => {
-      const { days } = await getAvailabilityCalendarData(membershipId, filmWindow.start, filmWindow.end);
-      const personAvailability: PersonAvailability = new Map();
-      for (const day of days) {
-        personAvailability.set(day.dateIso, { am: day.am?.tier ?? null, pm: day.pm?.tier ?? null });
-      }
-      availabilityByMembership.set(membershipId, personAvailability);
-    }),
+  const calendarByMembership = await getAvailabilityCalendarDataBatch(
+    allMembershipIds,
+    filmWindow.start,
+    filmWindow.end,
   );
+
+  const availabilityByMembership = new Map<string, PersonAvailability>();
+  for (const membershipId of allMembershipIds) {
+    const days = calendarByMembership.get(membershipId)?.days ?? [];
+    const personAvailability: PersonAvailability = new Map();
+    for (const day of days) {
+      personAvailability.set(day.dateIso, { am: day.am?.tier ?? null, pm: day.pm?.tier ?? null });
+    }
+    availabilityByMembership.set(membershipId, personAvailability);
+  }
 
   const searchStart = parseIsoDateUtc(input.searchStart);
   const searchEnd = parseIsoDateUtc(input.searchEnd);
