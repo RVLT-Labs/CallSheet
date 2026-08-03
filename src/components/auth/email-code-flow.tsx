@@ -86,9 +86,11 @@ export function EmailCodeFlow({ callbackURL, invite }: EmailCodeFlowProps) {
         <TextField
           label="Sign-in code"
           inputMode="numeric"
+          pattern="[0-9]*"
           autoComplete="one-time-code"
           maxLength={6}
           required
+          autoFocus
           placeholder="000000"
           value={otp}
           onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}

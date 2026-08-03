@@ -50,7 +50,7 @@ export function BottomTabBar({
   memberships = { active: [], wrapped: [] },
 }: NavProps) {
   return (
-    <nav className="flex justify-around border-t border-hairline bg-cream pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 md:hidden">
+    <nav className="sticky bottom-0 z-10 flex justify-around border-t border-hairline bg-cream pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 md:hidden">
       {items.map((item) => {
         const active = item.href === activeHref;
         const Icon = item.icon;

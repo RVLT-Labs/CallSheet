@@ -23,6 +23,12 @@ type Props = {
  * time (email-code-flow.tsx doesn't reset it on success) since this effect
  * runs, and its redirect lands, while that same form instance is still on
  * screen — so there's no gap where the page looks done but isn't.
+ *
+ * A brand-new user created by better-auth's emailOtp sign-up has no name yet
+ * (it defaults to ""), and this is the only login they've ever had — send
+ * them to /welcome to set it before landing on the dashboard, rather than
+ * introducing them to their crew as a blank. Someone accepting a second
+ * invite already has a name from their first film, so they go straight in.
  */
 export function AcceptInvitationClient({ invitationId, inviterName, filmName, role, email }: Props) {
   const { data: session } = useSession();
@@ -35,7 +41,7 @@ export function AcceptInvitationClient({ invitationId, inviterName, filmName, ro
 
     accepted.current = true;
     authClient.organization.acceptInvitation({ invitationId }).then(() => {
-      router.push("/");
+      router.push(session.user.name.trim() ? "/" : "/welcome");
     });
   }, [session, email, invitationId, router]);
 
