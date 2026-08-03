@@ -78,12 +78,15 @@ export async function addCrewMember(formData: FormData) {
   const { organizationId } = await requireActiveOrganiser();
   const email = String(formData.get("email") ?? "").trim();
   if (!email) throw new Error("Email is required");
-  const role = String(formData.get("role") ?? "").trim();
+  const roleTags = formData
+    .getAll("role")
+    .map((r) => String(r).trim())
+    .filter(Boolean);
 
   const requestHeaders = await headers();
   await auth.api.createInvitation({
     headers: requestHeaders,
-    body: { email, role: "member", organizationId, roleTags: role ? [role] : [] },
+    body: { email, role: "member", organizationId, roleTags },
   });
 
   revalidatePath("/settings");

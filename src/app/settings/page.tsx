@@ -24,7 +24,7 @@ export default async function SettingsPage() {
       activeOrganizationId={organizationId}
     >
       <CenteredCard wide>
-        <h1 className="font-display mb-5 text-2xl font-bold italic text-burgundy">{film.name} settings</h1>
+        <h1 className="font-display mb-5 text-2xl font-bold italic text-burgundy">Crew & Settings</h1>
         <FilmSettingsForm film={film} organisers={organisers} crew={crew} currentUserId={session.user.id} />
       </CenteredCard>
     </NavShell>

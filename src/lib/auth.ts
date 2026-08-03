@@ -103,7 +103,7 @@ export const auth = betterAuth({
         const { subject, html, text } = renderCrewInvitationEmail({
           inviterName: data.inviter.user.name,
           filmName: data.organization.name,
-          roleTag: roleTags?.[0] ?? null,
+          roleTags: roleTags ?? [],
           url,
         });
         await sendTemplatedEmail({ to: data.email, subject, html, text });
