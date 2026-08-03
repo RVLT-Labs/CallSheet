@@ -8,6 +8,7 @@ import { PageShell } from "@/components/ui/page-shell";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAvailabilityCalendarData } from "@/server/availability";
+import { getMembershipsForUser } from "@/server/memberships";
 
 export default async function AvailabilityPage() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -15,6 +16,10 @@ export default async function AvailabilityPage() {
 
   const organizationId = session.session.activeOrganizationId;
   if (!organizationId) redirect("/");
+
+  // Kicked off alongside the queries below, not awaited here, so NavShell's
+  // fetch overlaps with the rest of the page's data instead of running after it.
+  const membershipsPromise = getMembershipsForUser(session.user.id);
 
   const [film, membership] = await Promise.all([
     prisma.organization.findUniqueOrThrow({ where: { id: organizationId } }),
@@ -27,7 +32,7 @@ export default async function AvailabilityPage() {
 
   if (!film.dateRangeStart || !film.dateRangeEnd) {
     return (
-      <NavShell activeHref="/availability" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={organizationId}>
+      <NavShell activeHref="/availability" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={organizationId} memberships={membershipsPromise}>
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
           <p className="font-display text-xl font-bold italic text-burgundy">No working dates yet</p>
           <p className="max-w-sm text-sm text-ink-soft">
@@ -46,7 +51,7 @@ export default async function AvailabilityPage() {
   );
 
   return (
-    <NavShell activeHref="/availability" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={organizationId}>
+    <NavShell activeHref="/availability" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={organizationId} memberships={membershipsPromise}>
       <PageShell maxWidth="max-w-5xl">
         <div className="mb-6 flex items-baseline justify-between">
           <div>

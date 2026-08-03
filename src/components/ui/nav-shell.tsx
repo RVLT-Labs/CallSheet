@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { BottomTabBar, TopNav, DEFAULT_NAV_ITEMS, type NavItem, type NavUser } from "@/components/ui/nav";
 import { SettingsIcon } from "@/components/ui/icons";
-import { getMembershipsForUser } from "@/server/memberships";
+import { getMembershipsForUser, type Memberships } from "@/server/memberships";
 
 /**
  * The standard authenticated-page frame (issue #11) — desktop TopNav above
@@ -15,19 +15,33 @@ import { getMembershipsForUser } from "@/server/memberships";
  * switcher — pulling that into nav.tsx would drag Prisma into the client
  * bundle for any client component that imports TopNav/BottomTabBar directly
  * (e.g. the design-system showcase).
+ *
+ * Callers should pass `memberships` (kicked off alongside their own queries,
+ * or already-resolved if they needed it themselves) so this fetch overlaps
+ * with the rest of the page's data instead of running after it — every
+ * top-level route renders NavShell, so a fetch here that isn't parallelized
+ * adds its full round trip to every navigation. The self-fetch fallback
+ * below only exists for callers that genuinely have nothing to pass (e.g.
+ * the design-system showcase).
  */
 export async function NavShell({
   activeHref,
   user,
   activeOrganizationId = null,
+  memberships: membershipsInput,
   children,
 }: {
   activeHref: string;
   user?: NavUser;
   activeOrganizationId?: string | null;
+  memberships?: Memberships | Promise<Memberships>;
   children: ReactNode;
 }) {
-  const memberships = user ? await getMembershipsForUser(user.id) : { active: [], wrapped: [] };
+  const memberships = membershipsInput
+    ? await membershipsInput
+    : user
+      ? await getMembershipsForUser(user.id)
+      : { active: [], wrapped: [] };
 
   // Crew & Settings is organiser-only — /settings itself redirects crew away,
   // so don't dangle a nav item that just redirects them straight back out.

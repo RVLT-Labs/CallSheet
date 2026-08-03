@@ -8,6 +8,7 @@ import { NavShell } from "@/components/ui/nav-shell";
 import { PageShell } from "@/components/ui/page-shell";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getMembershipsForUser } from "@/server/memberships";
 import { getMyShootsData } from "@/server/my-shoots";
 import { getFilmCrew } from "@/server/shoot-planning";
 import { getFilmShoots } from "@/server/shoots-list";
@@ -18,6 +19,10 @@ export default async function ShootsPage() {
 
   const organizationId = session.session.activeOrganizationId;
   if (!organizationId) redirect("/");
+
+  // Kicked off alongside the queries below, not awaited here, so NavShell's
+  // fetch overlaps with the rest of the page's data instead of running after it.
+  const membershipsPromise = getMembershipsForUser(session.user.id);
 
   const [film, membership] = await Promise.all([
     prisma.organization.findUniqueOrThrow({ where: { id: organizationId } }),
@@ -32,7 +37,7 @@ export default async function ShootsPage() {
   if (!isOrganiser) {
     const { upcoming, past } = await getMyShootsData(membership.id, organizationId, film.showTentativeToCrew);
     return (
-      <NavShell activeHref="/shoots" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={organizationId}>
+      <NavShell activeHref="/shoots" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={organizationId} memberships={membershipsPromise}>
         <MyShoots upcoming={upcoming} past={past} />
       </NavShell>
     );
@@ -41,7 +46,7 @@ export default async function ShootsPage() {
   const [shoots, crew] = await Promise.all([getFilmShoots(organizationId), getFilmCrew(organizationId)]);
 
   return (
-    <NavShell activeHref="/shoots" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={organizationId}>
+    <NavShell activeHref="/shoots" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={organizationId} memberships={membershipsPromise}>
       <PageShell maxWidth="max-w-7xl">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="font-display text-2xl font-bold italic text-burgundy md:text-3xl">Shoots</h1>

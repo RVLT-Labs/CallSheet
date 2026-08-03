@@ -5,6 +5,7 @@ import { NavShell } from "@/components/ui/nav-shell";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { toIsoDate } from "@/server/availability-rules";
+import { getMembershipsForUser } from "@/server/memberships";
 import { getShootDetail, getTentativeAvailabilityRatio } from "@/server/shoot-detail";
 
 import { ShootDetailView } from "@/components/shoots/shoot-detail-view";
@@ -17,6 +18,10 @@ export default async function ShootDetailPage({ params }: { params: Promise<{ id
 
   const organizationId = session.session.activeOrganizationId;
   if (!organizationId) redirect("/");
+
+  // Kicked off alongside the queries below, not awaited here, so NavShell's
+  // fetch overlaps with the rest of the page's data instead of running after it.
+  const membershipsPromise = getMembershipsForUser(session.user.id);
 
   const membership = await prisma.member.findUnique({
     where: { organizationId_userId: { organizationId, userId: session.user.id } },
@@ -77,7 +82,7 @@ export default async function ShootDetailPage({ params }: { params: Promise<{ id
   };
 
   return (
-    <NavShell activeHref="/shoots" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={organizationId}>
+    <NavShell activeHref="/shoots" user={{ id: session.user.id, name: session.user.name }} activeOrganizationId={organizationId} memberships={membershipsPromise}>
       <ShootDetailView shoot={data} isOrganiser={isOrganiser} />
     </NavShell>
   );

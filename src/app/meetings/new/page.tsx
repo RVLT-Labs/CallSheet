@@ -4,7 +4,7 @@ import { getFilmCrew } from "@/server/shoot-planning";
 import { requireActiveOrganiserFilm } from "@/server/organiser";
 
 export default async function NewMeetingPage() {
-  const { session, organizationId, film } = await requireActiveOrganiserFilm();
+  const { session, organizationId, film, membershipsPromise } = await requireActiveOrganiserFilm();
 
   if (!film.dateRangeStart || !film.dateRangeEnd) {
     return (
@@ -12,6 +12,7 @@ export default async function NewMeetingPage() {
         activeHref="/meetings"
         user={{ id: session.user.id, name: session.user.name }}
         activeOrganizationId={organizationId}
+        memberships={membershipsPromise}
       >
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
           <p className="font-display text-xl font-bold italic text-burgundy">No working dates yet</p>
@@ -30,6 +31,7 @@ export default async function NewMeetingPage() {
       activeHref="/meetings"
       user={{ id: session.user.id, name: session.user.name }}
       activeOrganizationId={organizationId}
+      memberships={membershipsPromise}
     >
       <div className="mx-auto w-full max-w-2xl px-4 py-8 md:px-8">
         <h1 className="font-display mb-1 text-2xl font-bold italic text-burgundy">Plan a meeting</h1>

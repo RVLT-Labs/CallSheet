@@ -10,7 +10,7 @@ export default async function AvailabilityGridPage({
 }: {
   searchParams: Promise<{ required?: string }>;
 }) {
-  const { session, organizationId, film } = await requireActiveOrganiserFilm();
+  const { session, organizationId, film, membershipsPromise } = await requireActiveOrganiserFilm();
   const { required } = await searchParams;
   const requiredMembershipIds = required ? required.split(",").filter(Boolean) : [];
 
@@ -20,6 +20,7 @@ export default async function AvailabilityGridPage({
         activeHref="/availability"
         user={{ id: session.user.id, name: session.user.name }}
         activeOrganizationId={organizationId}
+        memberships={membershipsPromise}
       >
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
           <p className="font-display text-xl font-bold italic text-burgundy">No working dates yet</p>
@@ -55,6 +56,7 @@ export default async function AvailabilityGridPage({
       activeHref="/availability"
       user={{ id: session.user.id, name: session.user.name }}
       activeOrganizationId={organizationId}
+      memberships={membershipsPromise}
     >
       <PageShell maxWidth="max-w-7xl">
         <h1 className="font-display mb-1 text-2xl font-bold italic text-burgundy md:text-3xl">Crew availability</h1>
