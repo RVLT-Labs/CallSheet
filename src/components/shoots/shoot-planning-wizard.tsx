@@ -10,13 +10,20 @@ import { PillRow } from "@/components/ui/pill-row";
 import { StatusDot } from "@/components/ui/status-dot";
 import { TextField } from "@/components/ui/text-field";
 import { confirmShoot, suggestDates } from "@/app/shoots/new/actions";
-import type { DayStatus, DayWindow, RankedCandidate } from "@/server/scheduling-suggestions";
+import type { DayStatus, DayWindow, RankedCandidate, SuggestionTier } from "@/server/scheduling-suggestions";
 
 const STATUS_LABEL: Record<DayStatus, string> = { clear: "Clear", flagged: "Possible conflict", hard: "Blocked" };
 const STATUS_TONE: Record<DayStatus, "forest" | "terracotta" | "burgundy"> = {
   clear: "forest",
   flagged: "terracotta",
   hard: "burgundy",
+};
+
+const TIER_LABEL: Record<SuggestionTier, string> = { best: "Best", good: "Good", possible: "Possible" };
+const TIER_TONE: Record<SuggestionTier, "forest" | "terracotta" | "taupe"> = {
+  best: "forest",
+  good: "terracotta",
+  possible: "taupe",
 };
 
 type Step = 1 | 2 | 3 | 4;
@@ -328,51 +335,61 @@ export function ShootPlanningWizard({
               ? candidate.dayIsos[0]
               : `${candidate.dayIsos[0]} – ${candidate.dayIsos[candidate.dayIsos.length - 1]}`;
           const expanded = expandedIndex === i;
+          const showTierHeader = i === 0 || candidates[i - 1].tier !== candidate.tier;
           return (
-            <div key={candidate.startDateIso} className="border-b border-hairline py-3">
-              <button
-                type="button"
-                onClick={() => setExpandedIndex(expanded ? null : i)}
-                className="flex w-full items-center justify-between text-left"
-              >
-                <span className="text-[13px] font-semibold">{label}</span>
-                <span className="font-mono text-[12px] text-ink-soft">
-                  {candidate.availableCount}/{candidate.totalCount}
-                </span>
-              </button>
-
-              {expanded && (
-                <div className="mt-3 space-y-1.5">
-                  {candidate.breakdown.map((b, j) => (
-                    <div key={j} className="flex items-center justify-between text-[12px]">
-                      <span>
-                        {b.slot.kind === "member" ? b.slot.name : b.slot.label}{" "}
-                        <span className="text-ink-faint">({b.role === "required" ? "Required" : "Optional"})</span>
-                        {b.conflictLabel && <span className="block text-[11px] text-ink-faint">{b.conflictLabel}</span>}
-                      </span>
-                      {b.status ? (
-                        <StatusDot tone={STATUS_TONE[b.status]} label={STATUS_LABEL[b.status]} />
-                      ) : (
-                        <span className="text-ink-faint">
-                          {b.slot.kind === "placeholder" ? "Placeholder" : "Unknown"}
-                        </span>
-                      )}
-                    </div>
-                  ))}
+            <div key={candidate.startDateIso}>
+              {showTierHeader && (
+                <div className={`mb-1 flex items-center gap-2 ${i === 0 ? "" : "mt-4"}`}>
+                  <StatusDot tone={TIER_TONE[candidate.tier]} label={TIER_LABEL[candidate.tier]} />
                 </div>
               )}
+              <div className="border-b border-hairline py-3">
+                <button
+                  type="button"
+                  onClick={() => setExpandedIndex(expanded ? null : i)}
+                  className="flex w-full items-center justify-between text-left"
+                >
+                  <span className="text-[13px] font-semibold">{label}</span>
+                  <span className="font-mono text-[12px] text-ink-soft">
+                    {candidate.availableCount}/{candidate.totalCount}
+                  </span>
+                </button>
 
-              {candidate.hasConflict && (
-                <p className="mt-1.5 text-[11px] text-terracotta">Possible conflict — may still be workable</p>
-              )}
+                {expanded && (
+                  <div className="mt-3 space-y-1.5">
+                    {candidate.breakdown.map((b, j) => (
+                      <div key={j} className="flex items-center justify-between text-[12px]">
+                        <span>
+                          {b.slot.kind === "member" ? b.slot.name : b.slot.label}{" "}
+                          <span className="text-ink-faint">({b.role === "required" ? "Required" : "Optional"})</span>
+                          {b.conflictLabel && (
+                            <span className="block text-[11px] text-ink-faint">{b.conflictLabel}</span>
+                          )}
+                        </span>
+                        {b.status ? (
+                          <StatusDot tone={STATUS_TONE[b.status]} label={STATUS_LABEL[b.status]} />
+                        ) : (
+                          <span className="text-ink-faint">
+                            {b.slot.kind === "placeholder" ? "Placeholder" : "Unknown"}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-              <button
-                type="button"
-                onClick={() => setSelectedIndex(i)}
-                className={`mt-2 text-[12px] font-semibold ${selectedIndex === i ? "text-forest" : "text-burgundy"}`}
-              >
-                {selectedIndex === i ? "Selected ✓" : "Select this date"}
-              </button>
+                {candidate.hasConflict && (
+                  <p className="mt-1.5 text-[11px] text-terracotta">Possible conflict — may still be workable</p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedIndex(i)}
+                  className={`mt-2 text-[12px] font-semibold ${selectedIndex === i ? "text-forest" : "text-burgundy"}`}
+                >
+                  {selectedIndex === i ? "Selected ✓" : "Select this date"}
+                </button>
+              </div>
             </div>
           );
         })}

@@ -63,15 +63,33 @@ export type PersonBreakdown = {
   conflictLabel: string | null; // human-readable detail for the worst flagged/hard day, e.g. "Waitressing shift, 7:00 PM–11:00 PM"
 };
 
+/** Coarse bucket shown to the user above the continuous score — see tierFor(). */
+export type SuggestionTier = "best" | "good" | "possible";
+
 export type RankedCandidate = {
   startDateIso: string;
   dayIsos: string[];
   score: number;
+  tier: SuggestionTier;
   hasConflict: boolean; // true when a required person has a soft-block conflict on any day — sorts after fully-free candidates, never disqualifies
   availableCount: number;
   totalCount: number;
   breakdown: PersonBreakdown[];
 };
+
+const TIER_ORDER: Record<SuggestionTier, number> = { best: 0, good: 1, possible: 2 };
+
+/**
+ * Buckets the continuous score into the three tiers shown in the UI.
+ * "best" requires a perfect score (no required-person conflict and no
+ * general-crew hard blocks); "good" and "possible" split the rest at a
+ * threshold below which most of the crew is unavailable.
+ */
+export function tierFor(score: number): SuggestionTier {
+  if (score >= 1) return "best";
+  if (score >= 0.7) return "good";
+  return "possible";
+}
 
 function candidateDayIsos(startDate: Date, numDays: number) {
   const isos: string[] = [];
@@ -177,6 +195,7 @@ function evaluateCandidate(
     startDateIso: toIsoDate(startDate),
     dayIsos,
     score,
+    tier: tierFor(score),
     hasConflict,
     availableCount,
     totalCount: realPeople.length,
@@ -184,7 +203,7 @@ function evaluateCandidate(
   };
 }
 
-/** Ranks every candidate start-date within the search window, fully-free first, then best score first. */
+/** Ranks every candidate start-date within the search window: best tier first, then chronologically within each tier. */
 export function rankCandidates(input: CandidateInput): RankedCandidate[] {
   const candidates: RankedCandidate[] = [];
   const lastPossibleStart = new Date(input.searchEnd.getTime() - (input.numDays - 1) * 86_400_000);
@@ -200,9 +219,6 @@ export function rankCandidates(input: CandidateInput): RankedCandidate[] {
   }
 
   return candidates.sort(
-    (a, b) =>
-      Number(a.hasConflict) - Number(b.hasConflict) ||
-      b.score - a.score ||
-      a.startDateIso.localeCompare(b.startDateIso),
+    (a, b) => TIER_ORDER[a.tier] - TIER_ORDER[b.tier] || a.startDateIso.localeCompare(b.startDateIso),
   );
 }

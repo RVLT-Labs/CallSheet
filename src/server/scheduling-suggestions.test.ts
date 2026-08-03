@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { dayStatus, rankCandidates, type AvailabilityBlockRef, type CandidateInput, type PersonAvailability } from "@/server/scheduling-suggestions";
+import {
+  dayStatus,
+  rankCandidates,
+  tierFor,
+  type AvailabilityBlockRef,
+  type CandidateInput,
+  type PersonAvailability,
+} from "@/server/scheduling-suggestions";
 import { utcDate } from "@/server/availability-rules";
 
 function block(overrides: Partial<AvailabilityBlockRef> = {}): AvailabilityBlockRef {
@@ -132,6 +139,58 @@ describe("rankCandidates", () => {
     const results = rankCandidates(input);
     expect(results).toHaveLength(1);
     expect(results[0].score).toBe(1);
+    expect(results[0].tier).toBe("best");
     expect(results[0].breakdown[0].status).toBe("clear");
+  });
+
+  it("groups candidates into best/good/possible tiers and sorts by date within each tier", () => {
+    const input = baseInput({
+      searchStart: utcDate(2026, 7, 1),
+      searchEnd: utcDate(2026, 7, 4),
+      required: [{ kind: "member", membershipId: "req1", name: "Req" }],
+      general: [
+        { kind: "member", membershipId: "gen1", name: "Gen1" },
+        { kind: "member", membershipId: "gen2", name: "Gen2" },
+        { kind: "member", membershipId: "gen3", name: "Gen3" },
+        { kind: "member", membershipId: "gen4", name: "Gen4" },
+      ],
+      availabilityByMembership: new Map([
+        // 08-04: fully clear for everyone -> best.
+        // 08-01: required has a soft-block conflict, general fully clear -> good.
+        ["req1", availability({ "2026-08-01": [block({ blockType: "soft" })] })],
+        // 08-02: required clear, but the whole general crew is hard-blocked -> possible.
+        ["gen1", availability({ "2026-08-02": [block({ blockType: "hard" })] })],
+        ["gen2", availability({ "2026-08-02": [block({ blockType: "hard" })] })],
+        ["gen3", availability({ "2026-08-02": [block({ blockType: "hard" })] })],
+        ["gen4", availability({ "2026-08-02": [block({ blockType: "hard" })] })],
+      ]),
+    });
+    const results = rankCandidates(input);
+    const byDate = new Map(results.map((r) => [r.startDateIso, r]));
+
+    expect(byDate.get("2026-08-04")?.tier).toBe("best");
+    expect(byDate.get("2026-08-01")?.tier).toBe("good");
+    expect(byDate.get("2026-08-02")?.tier).toBe("possible");
+
+    // Tier order first (best, good, possible), chronological within each tier.
+    // 08-03 has no availability data for anyone, so it's fully clear too (best), and sorts before 08-04.
+    expect(results.map((r) => r.startDateIso)).toEqual(["2026-08-03", "2026-08-04", "2026-08-01", "2026-08-02"]);
+  });
+});
+
+describe("tierFor", () => {
+  it("is best only for a perfect score", () => {
+    expect(tierFor(1)).toBe("best");
+    expect(tierFor(0.99)).toBe("good");
+  });
+
+  it("is good from 0.7 up to (not including) a perfect score", () => {
+    expect(tierFor(0.7)).toBe("good");
+    expect(tierFor(0.85)).toBe("good");
+  });
+
+  it("is possible below 0.7", () => {
+    expect(tierFor(0.69)).toBe("possible");
+    expect(tierFor(0)).toBe("possible");
   });
 });
