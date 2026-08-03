@@ -8,9 +8,14 @@ import { prisma } from "@/lib/prisma";
 import { getMembershipsForUser } from "@/server/memberships";
 
 /**
- * Self-signup (no invite) landing spot — someone who typed their email in
- * at /sign-in rather than following an invite link. Invited crew already
- * get a film via acceptInvitation, so they skip straight past this.
+ * Onboarding landing spot, reached two ways:
+ *  - Self-signup (no invite): someone who typed their email in at /sign-in
+ *    rather than following an invite link. Walks name -> create a film.
+ *  - Invited crew, first login ever: they already have a film via
+ *    acceptInvitation (better-auth's emailOtp sign-up leaves a brand-new
+ *    user's name blank), so they only need the name step before landing
+ *    on the dashboard — accept-invitation-client.tsx sends them here
+ *    instead of "/" when their name is still blank.
  */
 export default async function WelcomePage() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -22,11 +27,15 @@ export default async function WelcomePage() {
   });
 
   const { active, wrapped } = await getMembershipsForUser(session.user.id);
-  if (user.onboardedAt || active.length > 0 || wrapped.length > 0) redirect("/");
+  const hasFilm = active.length > 0 || wrapped.length > 0;
+
+  // Self-signup users who've finished onboarding, or invited crew who
+  // already have a name, have nothing left to do here.
+  if (user.onboardedAt || (hasFilm && user.name.trim())) redirect("/");
 
   return (
     <CenteredCard wide>
-      <WelcomeFlow initialName={user.name} />
+      <WelcomeFlow initialName={user.name} skipFilmStep={hasFilm} />
     </CenteredCard>
   );
 }

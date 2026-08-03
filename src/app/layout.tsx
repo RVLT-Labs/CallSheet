@@ -46,7 +46,11 @@ export default function RootLayout({
       lang="en"
       className={`${inter.variable} ${playfairDisplay.variable} ${spaceMono.variable} h-full antialiased`}
     >
-      <body className="min-h-dvh flex flex-col bg-cream text-ink font-sans">
+      {/* pt-safe-area mirrors the pb-safe-area handling already on
+          BottomTabBar/StickyFooterAction/ErrorToast — without it, content
+          draws flush with the very top of the viewport and sits under the
+          status bar / dynamic island on notched iPhones instead of below it. */}
+      <body className="min-h-dvh flex flex-col bg-cream text-ink font-sans pt-[env(safe-area-inset-top)]">
         {children}
         <SpeedInsights />
         <Analytics />

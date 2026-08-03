@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { TextField } from "@/components/ui/text-field";
@@ -14,8 +15,12 @@ type Step = "name" | "film";
  * dashboard tour picks up from there (film-creation-wizard.tsx redirects
  * with ?tour=1 on finish). Someone who already has a name resumes at the
  * film step rather than re-asking it.
+ *
+ * Invited crew (skipFilmStep) already have a film via the invitation they
+ * accepted — they only ever need the name step, then straight to "/".
  */
-export function WelcomeFlow({ initialName }: { initialName: string }) {
+export function WelcomeFlow({ initialName, skipFilmStep }: { initialName: string; skipFilmStep?: boolean }) {
+  const router = useRouter();
   const [step, setStep] = useState<Step>(initialName.trim() ? "film" : "name");
   const [name, setName] = useState(initialName);
   const [saving, setSaving] = useState(false);
@@ -27,10 +32,13 @@ export function WelcomeFlow({ initialName }: { initialName: string }) {
     setError(null);
     try {
       await saveOnboardingName(name);
-      setStep("film");
+      if (skipFilmStep) {
+        router.push("/");
+      } else {
+        setStep("film");
+      }
     } catch {
       setError("Something went wrong saving that. Try again.");
-    } finally {
       setSaving(false);
     }
   }

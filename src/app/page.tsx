@@ -40,6 +40,13 @@ export default async function Home({
   const activeOrganizationId = session.session.activeOrganizationId ?? null;
   const activeFilm = active.find((m) => m.organization.id === activeOrganizationId);
 
+  // Safety net for invited crew who reach "/" with a film but no name yet
+  // (accept-invitation-client.tsx routes them to /welcome directly, but
+  // this covers any other path back here before that name is set).
+  if (!session.user.name.trim() && (active.length > 0 || wrapped.length > 0)) {
+    redirect("/welcome");
+  }
+
   if (!activeFilm) {
     // Self-signup (no invite): zero films, never onboarded — collect their
     // name and get their first film made before dropping them here.

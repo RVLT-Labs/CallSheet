@@ -28,3 +28,19 @@
 body {
   font-family: var(--font-sans);
 }
+
+/*
+ * iOS Safari zooms the whole page in when a focused input's computed
+ * font-size is under 16px, and nothing in the app un-zooms it afterwards —
+ * the layout stays zoomed until the user manually pinches back out. Forcing
+ * 16px on mobile only (below the design system's md breakpoint) keeps every
+ * text-field, textarea, and select at the sizes callsheet-design-system.md
+ * specifies on larger screens, where this zoom doesn't happen.
+ */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
