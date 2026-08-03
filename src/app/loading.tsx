@@ -1,16 +1,26 @@
+import { PageShell } from "@/components/ui/page-shell";
+import { Skeleton, SkeletonListRows, SkeletonNavShell, SkeletonSidePanel } from "@/components/ui/skeleton";
+
 /**
- * App-wide route loading state (Next.js convention — picked up for any
- * navigation whose target page suspends, e.g. the dashboard's Prisma
- * queries). Without this, a slow navigation just leaves the previous page
- * sitting on screen looking frozen instead of showing anything is happening.
+ * App-wide route loading state (Next.js convention) — shaped like the
+ * dashboard (CrewToday/OrganiserDashboard share this frame) since "/" is
+ * where most navigations land. Real nav chrome up top so a slow navigation
+ * never drops to an unrelated full-page spinner; only the content pulses.
  */
 export default function Loading() {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-24 text-center">
-      <p className="font-display animate-pulse text-3xl font-bold italic text-burgundy">
-        Callsheet
-      </p>
-      <p className="text-[12.5px] text-ink-soft">Loading…</p>
-    </div>
+    <SkeletonNavShell activeHref="/">
+      <PageShell maxWidth="max-w-7xl">
+        <Skeleton className="mb-1 h-3 w-24" />
+        <Skeleton className="mb-8 h-8 w-40" />
+        <div className="lg:grid lg:grid-cols-[1fr_280px] lg:items-start lg:gap-10">
+          <div>
+            <Skeleton className="mb-2 h-3 w-20" />
+            <SkeletonListRows count={5} />
+          </div>
+          <SkeletonSidePanel />
+        </div>
+      </PageShell>
+    </SkeletonNavShell>
   );
 }
