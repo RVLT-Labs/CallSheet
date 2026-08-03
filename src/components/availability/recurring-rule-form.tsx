@@ -8,14 +8,9 @@ import { OptGroup } from "@/components/ui/opt-group";
 import { PillRow } from "@/components/ui/pill-row";
 import { TextField } from "@/components/ui/text-field";
 import { createRecurringRule, deleteRecurringRule, updateRecurringRule } from "@/app/availability/actions";
-import { DAY_NAMES, TIER_LABEL, TIER_OPTIONS, type Tier } from "@/lib/availability-tiers";
+import { BLOCK_TYPE_LABEL, BLOCK_TYPE_OPTIONS, DAY_NAMES, type BlockType } from "@/lib/availability-blocks";
+import { formatTimeRange } from "@/lib/time";
 import type { RuleRow } from "@/components/availability/recurring-rules-section";
-
-type HalfDayChoice = "AM" | "PM" | "BOTH";
-
-function toHalfDayChoice(halfDay: "AM" | "PM" | null): HalfDayChoice {
-  return halfDay ?? "BOTH";
-}
 
 export function RecurringRuleForm({
   rule,
@@ -35,8 +30,9 @@ export function RecurringRuleForm({
     if (rule) initial[rule.dayOfWeek] = true;
     return initial;
   });
-  const [halfDay, setHalfDay] = useState<HalfDayChoice>(toHalfDayChoice(rule?.halfDay ?? null));
-  const [tier, setTier] = useState<Tier>((rule?.tier as Tier) ?? "unavailable");
+  const [startTime, setStartTime] = useState(rule?.startTime ?? "09:00");
+  const [endTime, setEndTime] = useState(rule?.endTime ?? "17:00");
+  const [blockType, setBlockType] = useState<BlockType>((rule?.blockType as BlockType) ?? "hard");
   const [label, setLabel] = useState(rule?.label ?? "");
   const [effectiveStart, setEffectiveStart] = useState(rule?.effectiveStart ?? windowStart);
   const [endsMode, setEndsMode] = useState<"never" | "onDate">(rule?.effectiveEnd ? "onDate" : "never");
@@ -53,8 +49,7 @@ export function RecurringRuleForm({
   }
 
   const selectedDayNames = days.map((v, i) => (v ? DAY_NAMES[i] : null)).filter(Boolean) as string[];
-  const halfDayLabel = halfDay === "AM" ? "morning" : halfDay === "PM" ? "afternoon" : "all day";
-  const summary = `Repeats every week on ${selectedDayNames.join(", ") || "no days yet"}, ${halfDayLabel} · ${TIER_LABEL[tier]}. Ends ${
+  const summary = `Repeats every week on ${selectedDayNames.join(", ") || "no days yet"}, ${formatTimeRange(startTime, endTime)} · ${BLOCK_TYPE_LABEL[blockType]}. Ends ${
     endsMode === "never" ? "never" : `on ${effectiveEnd}`
   }.`;
 
@@ -66,15 +61,15 @@ export function RecurringRuleForm({
     setPending(true);
     setError(null);
     try {
-      const halfDayValue = halfDay === "BOTH" ? null : halfDay;
       const effectiveEndValue = endsMode === "onDate" ? effectiveEnd : "";
 
       if (isEdit && rule) {
         const dayOfWeek = days.findIndex(Boolean);
         await updateRecurringRule(rule.id, {
           dayOfWeek,
-          halfDay: halfDayValue,
-          tier,
+          startTime,
+          endTime,
+          blockType,
           label,
           effectiveStart,
           effectiveEnd: effectiveEndValue,
@@ -83,8 +78,9 @@ export function RecurringRuleForm({
         const daysOfWeek = days.map((v, i) => (v ? i : -1)).filter((i) => i >= 0);
         await createRecurringRule({
           daysOfWeek,
-          halfDay: halfDayValue,
-          tier,
+          startTime,
+          endTime,
+          blockType,
           label,
           effectiveStart,
           effectiveEnd: effectiveEndValue,
@@ -109,20 +105,14 @@ export function RecurringRuleForm({
       <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Days</p>
       <DayChips selected={days} onToggle={toggleDay} />
 
-      <p className="mb-2 mt-5 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Half-day</p>
-      <PillRow
-        aria-label="Half-day"
-        options={[
-          { value: "AM", label: "Morning" },
-          { value: "PM", label: "Afternoon" },
-          { value: "BOTH", label: "Both" },
-        ]}
-        value={halfDay}
-        onChange={setHalfDay}
-      />
+      <p className="mb-2 mt-5 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Time</p>
+      <div className="grid grid-cols-2 gap-3.5">
+        <TextField label="Start time" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+        <TextField label="End time" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+      </div>
 
-      <p className="mb-2 mt-5 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Tier</p>
-      <OptGroup aria-label="Tier" options={TIER_OPTIONS} value={tier} onChange={setTier} />
+      <p className="mb-2 mt-5 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Type</p>
+      <OptGroup aria-label="Blocker type" options={BLOCK_TYPE_OPTIONS} value={blockType} onChange={setBlockType} />
 
       <div className="mt-5">
         <TextField

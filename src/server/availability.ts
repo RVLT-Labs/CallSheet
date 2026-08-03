@@ -2,12 +2,11 @@ import { headers } from "next/headers";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { Tier } from "@/lib/availability-tiers";
+import type { BlockType } from "@/lib/availability-blocks";
 import {
   parseIsoDateUtc,
   resolveAvailabilityWindow,
   toIsoDate,
-  type HalfDay,
   type ManualEntry,
   type RecurringRule,
 } from "@/server/availability-rules";
@@ -30,44 +29,74 @@ export async function requireActiveMembership() {
 }
 
 type ExistingAvailabilityRow = Awaited<ReturnType<typeof prisma.availability.findMany>>[number];
-type UpsertRow = { date: Date; halfDay: HalfDay; tier: Tier; sourceRuleId: string | null };
+type UpsertRow = {
+  date: Date;
+  startTime: string;
+  endTime: string;
+  blockType: BlockType;
+  label: string | null;
+  sourceRuleId: string;
+};
 
 /**
  * Pure diff between a membership's recurring rules and its currently-stored
  * Availability rows: which recurring rows are now stale (rule no longer
- * applies) and which need upserting (rule is new or changed), plus the fully
- * resolved window (manual entries always win — spec §10). Shared by the
- * single-membership and batched persist paths below so they can't drift.
+ * applies to that date) and which need upserting (rule is new or changed),
+ * plus the fully resolved window (manual entries always win — spec §10).
+ * Shared by the single-membership and batched persist paths below so they
+ * can't drift.
  */
 function diffAvailabilityWindow(
   rules: RecurringRule[],
   existing: ExistingAvailabilityRow[],
+  overrideDates: Set<string>,
   windowStart: Date,
   windowEnd: Date,
 ) {
   const manualEntries: ManualEntry[] = existing
     .filter((row) => row.source === "manual")
-    .map((row) => ({ date: row.date, halfDay: row.halfDay, tier: row.tier }));
+    .map((row) => ({
+      id: row.id,
+      date: row.date,
+      startTime: row.startTime,
+      endTime: row.endTime,
+      blockType: row.blockType,
+      label: row.label,
+    }));
 
-  const resolved = resolveAvailabilityWindow(rules, manualEntries, windowStart, windowEnd);
+  const resolved = resolveAvailabilityWindow(rules, manualEntries, overrideDates, windowStart, windowEnd);
 
   const resolvedRecurring = resolved.filter((r) => r.source === "recurring");
-  const resolvedKeys = new Set(resolvedRecurring.map((r) => `${toIsoDate(r.date)}-${r.halfDay}`));
+  const resolvedByKey = new Map(resolvedRecurring.map((r) => [`${toIsoDate(r.date)}-${r.ruleId}`, r]));
 
-  const staleRecurringIds = existing
-    .filter((row) => row.source === "recurring" && !resolvedKeys.has(`${toIsoDate(row.date)}-${row.halfDay}`))
+  const existingRecurring = existing.filter((row) => row.source === "recurring");
+  const existingByKey = new Map(existingRecurring.map((row) => [`${toIsoDate(row.date)}-${row.sourceRuleId}`, row]));
+
+  const staleRecurringIds = existingRecurring
+    .filter((row) => !resolvedByKey.has(`${toIsoDate(row.date)}-${row.sourceRuleId}`))
     .map((row) => row.id);
-
-  const existingByKey = new Map(existing.map((row) => [`${toIsoDate(row.date)}-${row.halfDay}`, row]));
 
   const upserts: UpsertRow[] = resolvedRecurring
     .filter((r) => {
-      const current = existingByKey.get(`${toIsoDate(r.date)}-${r.halfDay}`);
-      return !current || current.tier !== r.tier || current.source !== "recurring" || current.sourceRuleId !== r.ruleId;
+      const current = existingByKey.get(`${toIsoDate(r.date)}-${r.ruleId}`);
+      return (
+        !current ||
+        current.startTime !== r.startTime ||
+        current.endTime !== r.endTime ||
+        current.blockType !== r.blockType ||
+        current.label !== r.label
+      );
     })
-    .map((r) => ({ date: r.date, halfDay: r.halfDay, tier: r.tier, sourceRuleId: r.ruleId }));
+    .map((r) => ({ date: r.date, startTime: r.startTime, endTime: r.endTime, blockType: r.blockType, label: r.label, sourceRuleId: r.ruleId! }));
 
   return { resolved, staleRecurringIds, upserts };
+}
+
+async function loadOverrideDates(membershipId: string, windowStart: Date, windowEnd: Date) {
+  const rows = await prisma.availabilityDateOverride.findMany({
+    where: { membershipId, date: { gte: windowStart, lte: windowEnd } },
+  });
+  return new Set(rows.map((r) => toIsoDate(r.date)));
 }
 
 /**
@@ -76,7 +105,7 @@ function diffAvailabilityWindow(
  * Manual rows are never touched. Recurring rows are upserted where a rule now
  * applies and deleted where a rule no longer applies (e.g. after an edit or
  * delete), so a read of the Availability table alone is always the resolved
- * view — downstream epics (aggregate grid #7, suggestion algorithm #8) don't
+ * view — downstream consumers (aggregate grid, suggestion algorithm) don't
  * need to re-derive precedence themselves.
  *
  * Returns the resolved window and rules it just computed so callers (see
@@ -88,7 +117,7 @@ export async function resolveAndPersistAvailabilityWindow(
   windowStart: Date,
   windowEnd: Date,
 ) {
-  const [rules, existing] = await Promise.all([
+  const [rules, existing, overrideDates] = await Promise.all([
     prisma.recurringAvailabilityRule.findMany({
       where: { membershipId },
       orderBy: { createdAt: "asc" },
@@ -96,11 +125,13 @@ export async function resolveAndPersistAvailabilityWindow(
     prisma.availability.findMany({
       where: { membershipId, date: { gte: windowStart, lte: windowEnd } },
     }),
+    loadOverrideDates(membershipId, windowStart, windowEnd),
   ]);
 
   const { resolved, staleRecurringIds, upserts } = diffAvailabilityWindow(
     rules as RecurringRule[],
     existing,
+    overrideDates,
     windowStart,
     windowEnd,
   );
@@ -112,16 +143,18 @@ export async function resolveAndPersistAvailabilityWindow(
         : []),
       ...upserts.map((r) =>
         prisma.availability.upsert({
-          where: { membershipId_date_halfDay: { membershipId, date: r.date, halfDay: r.halfDay } },
+          where: { membershipId_date_sourceRuleId: { membershipId, date: r.date, sourceRuleId: r.sourceRuleId } },
           create: {
             membershipId,
             date: r.date,
-            halfDay: r.halfDay,
-            tier: r.tier,
+            startTime: r.startTime,
+            endTime: r.endTime,
+            blockType: r.blockType,
+            label: r.label,
             source: "recurring",
             sourceRuleId: r.sourceRuleId,
           },
-          update: { tier: r.tier, source: "recurring", sourceRuleId: r.sourceRuleId },
+          update: { startTime: r.startTime, endTime: r.endTime, blockType: r.blockType, label: r.label },
         }),
       ),
     ]);
@@ -130,21 +163,33 @@ export async function resolveAndPersistAvailabilityWindow(
   return { resolved, rules };
 }
 
-export type DayCell = {
-  dateIso: string;
-  am: { tier: Tier; source: "manual" | "recurring"; ruleLabel: string | null } | null;
-  pm: { tier: Tier; source: "manual" | "recurring"; ruleLabel: string | null } | null;
+export type DayCellBlock = {
+  id: string | null; // null for a recurring-derived block — override the date to edit it directly, see clearDateToFree
+  startTime: string;
+  endTime: string;
+  blockType: BlockType;
+  label: string | null;
+  source: "manual" | "recurring";
+  ruleLabel: string | null;
 };
+
+export type DayCell = { dateIso: string; blocks: DayCellBlock[] };
 
 function toDays(resolved: ReturnType<typeof resolveAvailabilityWindow>): DayCell[] {
   const byDate = new Map<string, DayCell>();
 
   for (const entry of resolved) {
     const dateIso = toIsoDate(entry.date);
-    const cell = byDate.get(dateIso) ?? { dateIso, am: null, pm: null };
-    const dayEntry = { tier: entry.tier as Tier, source: entry.source, ruleLabel: entry.ruleLabel };
-    if (entry.halfDay === "AM") cell.am = dayEntry;
-    else cell.pm = dayEntry;
+    const cell = byDate.get(dateIso) ?? { dateIso, blocks: [] };
+    cell.blocks.push({
+      id: entry.id,
+      startTime: entry.startTime,
+      endTime: entry.endTime,
+      blockType: entry.blockType,
+      label: entry.label,
+      source: entry.source,
+      ruleLabel: entry.ruleLabel,
+    });
     byDate.set(dateIso, cell);
   }
 
@@ -178,12 +223,15 @@ export async function getAvailabilityCalendarDataBatch(
   const uniqueIds = [...new Set(membershipIds)];
   if (uniqueIds.length === 0) return result;
 
-  const [allRules, allExisting] = await Promise.all([
+  const [allRules, allExisting, allOverrides] = await Promise.all([
     prisma.recurringAvailabilityRule.findMany({
       where: { membershipId: { in: uniqueIds } },
       orderBy: { createdAt: "asc" },
     }),
     prisma.availability.findMany({
+      where: { membershipId: { in: uniqueIds }, date: { gte: windowStart, lte: windowEnd } },
+    }),
+    prisma.availabilityDateOverride.findMany({
       where: { membershipId: { in: uniqueIds }, date: { gte: windowStart, lte: windowEnd } },
     }),
   ]);
@@ -202,14 +250,22 @@ export async function getAvailabilityCalendarDataBatch(
     existingByMembership.set(row.membershipId, list);
   }
 
+  const overridesByMembership = new Map<string, Set<string>>();
+  for (const row of allOverrides) {
+    const set = overridesByMembership.get(row.membershipId) ?? new Set<string>();
+    set.add(toIsoDate(row.date));
+    overridesByMembership.set(row.membershipId, set);
+  }
+
   const deleteIds: string[] = [];
   const upserts: (UpsertRow & { membershipId: string })[] = [];
 
   for (const membershipId of uniqueIds) {
     const rules = rulesByMembership.get(membershipId) ?? [];
     const existing = existingByMembership.get(membershipId) ?? [];
+    const overrideDates = overridesByMembership.get(membershipId) ?? new Set<string>();
 
-    const diff = diffAvailabilityWindow(rules as RecurringRule[], existing, windowStart, windowEnd);
+    const diff = diffAvailabilityWindow(rules as RecurringRule[], existing, overrideDates, windowStart, windowEnd);
     deleteIds.push(...diff.staleRecurringIds);
     upserts.push(...diff.upserts.map((u) => ({ ...u, membershipId })));
 
@@ -222,16 +278,20 @@ export async function getAvailabilityCalendarDataBatch(
       ...(deleteIds.length ? [prisma.availability.deleteMany({ where: { id: { in: deleteIds } } })] : []),
       ...upserts.map((u) =>
         prisma.availability.upsert({
-          where: { membershipId_date_halfDay: { membershipId: u.membershipId, date: u.date, halfDay: u.halfDay } },
+          where: {
+            membershipId_date_sourceRuleId: { membershipId: u.membershipId, date: u.date, sourceRuleId: u.sourceRuleId },
+          },
           create: {
             membershipId: u.membershipId,
             date: u.date,
-            halfDay: u.halfDay,
-            tier: u.tier,
+            startTime: u.startTime,
+            endTime: u.endTime,
+            blockType: u.blockType,
+            label: u.label,
             source: "recurring",
             sourceRuleId: u.sourceRuleId,
           },
-          update: { tier: u.tier, source: "recurring", sourceRuleId: u.sourceRuleId },
+          update: { startTime: u.startTime, endTime: u.endTime, blockType: u.blockType, label: u.label },
         }),
       ),
     ]);
@@ -240,29 +300,68 @@ export async function getAvailabilityCalendarDataBatch(
   return result;
 }
 
-export async function setAvailabilityTier(membershipId: string, dateIso: string, halfDay: HalfDay, tier: Tier) {
-  const date = parseIsoDateUtc(dateIso);
+export type BlockInput = { startTime: string; endTime: string; blockType: BlockType; label: string | null };
 
-  await prisma.availability.upsert({
-    where: { membershipId_date_halfDay: { membershipId, date, halfDay } },
-    create: { membershipId, date, halfDay, tier, source: "manual", sourceRuleId: null },
-    update: { tier, source: "manual", sourceRuleId: null },
-  });
+/** Adding a manual block on a date always supersedes whatever a recurring rule would generate there (spec §10). */
+export async function createManualBlock(membershipId: string, dateIso: string, input: BlockInput) {
+  const date = parseIsoDateUtc(dateIso);
+  await prisma.$transaction([
+    prisma.availability.create({
+      data: { membershipId, date, source: "manual", sourceRuleId: null, ...input },
+    }),
+    prisma.availabilityDateOverride.deleteMany({ where: { membershipId, date } }),
+  ]);
 }
 
-export async function setAvailabilityBulk(
-  membershipId: string,
-  cells: { dateIso: string; halfDay: HalfDay }[],
-  tier: Tier,
-) {
-  await prisma.$transaction(
-    cells.map(({ dateIso, halfDay }) => {
-      const date = parseIsoDateUtc(dateIso);
-      return prisma.availability.upsert({
-        where: { membershipId_date_halfDay: { membershipId, date, halfDay } },
-        create: { membershipId, date, halfDay, tier, source: "manual", sourceRuleId: null },
-        update: { tier, source: "manual", sourceRuleId: null },
-      });
+export async function createManualBlockBulk(membershipId: string, dateIsos: string[], input: BlockInput) {
+  const dates = dateIsos.map(parseIsoDateUtc);
+  await prisma.$transaction([
+    prisma.availability.createMany({
+      data: dates.map((date) => ({ membershipId, date, source: "manual" as const, sourceRuleId: null, ...input })),
     }),
-  );
+    prisma.availabilityDateOverride.deleteMany({ where: { membershipId, date: { in: dates } } }),
+  ]);
+}
+
+export async function updateManualBlock(blockId: string, membershipId: string, input: BlockInput) {
+  const block = await prisma.availability.findUniqueOrThrow({ where: { id: blockId } });
+  if (block.membershipId !== membershipId || block.source !== "manual") throw new Error("Block not found");
+
+  await prisma.availability.update({ where: { id: blockId }, data: input });
+}
+
+/**
+ * Deletes a manual block. If that was the date's last manual block, the date
+ * is marked with an override marker so a recurring rule doesn't silently
+ * resume governing it — deleting an override is itself an override (spec §10).
+ */
+export async function deleteManualBlock(blockId: string, membershipId: string) {
+  const block = await prisma.availability.findUniqueOrThrow({ where: { id: blockId } });
+  if (block.membershipId !== membershipId || block.source !== "manual") throw new Error("Block not found");
+
+  await prisma.availability.delete({ where: { id: blockId } });
+
+  const remaining = await prisma.availability.count({
+    where: { membershipId, date: block.date, source: "manual" },
+  });
+  if (remaining === 0) {
+    await prisma.availabilityDateOverride.upsert({
+      where: { membershipId_date: { membershipId, date: block.date } },
+      create: { membershipId, date: block.date },
+      update: {},
+    });
+  }
+}
+
+/** Explicitly clears a date to fully free, overriding any recurring-rule-derived blocks without adding a replacement. */
+export async function clearDateToFree(membershipId: string, dateIso: string) {
+  const date = parseIsoDateUtc(dateIso);
+  await prisma.$transaction([
+    prisma.availability.deleteMany({ where: { membershipId, date, source: "manual" } }),
+    prisma.availabilityDateOverride.upsert({
+      where: { membershipId_date: { membershipId, date } },
+      create: { membershipId, date },
+      update: {},
+    }),
+  ]);
 }

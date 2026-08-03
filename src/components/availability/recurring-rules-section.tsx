@@ -5,13 +5,15 @@ import { useState } from "react";
 import { ListRow } from "@/components/ui/list-row";
 import { Sheet } from "@/components/ui/sheet";
 import { RecurringRuleForm } from "@/components/availability/recurring-rule-form";
-import { DAY_NAMES, TIER_LABEL, type Tier } from "@/lib/availability-tiers";
+import { BLOCK_TYPE_LABEL, DAY_NAMES, type BlockType } from "@/lib/availability-blocks";
+import { formatTimeRange } from "@/lib/time";
 
 export type RuleRow = {
   id: string;
   dayOfWeek: number;
-  halfDay: "AM" | "PM" | null;
-  tier: string;
+  startTime: string;
+  endTime: string;
+  blockType: string;
   label: string | null;
   effectiveStart: string;
   effectiveEnd: string | null;
@@ -19,8 +21,7 @@ export type RuleRow = {
 
 function summarize(rule: RuleRow) {
   const dayName = DAY_NAMES[rule.dayOfWeek];
-  const halfDayLabel = rule.halfDay === "AM" ? "morning" : rule.halfDay === "PM" ? "afternoon" : "all day";
-  return `Every ${dayName}, ${halfDayLabel} · ${TIER_LABEL[rule.tier as Tier]}`;
+  return `Every ${dayName}, ${formatTimeRange(rule.startTime, rule.endTime)} · ${BLOCK_TYPE_LABEL[rule.blockType as BlockType]}`;
 }
 
 /**

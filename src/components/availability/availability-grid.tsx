@@ -6,7 +6,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { RoleChip } from "@/components/ui/role-chip";
 import { TextField } from "@/components/ui/text-field";
 import { cn } from "@/lib/cn";
-import { TIER_BG, TIER_LABEL, type Tier } from "@/lib/availability-tiers";
+import type { DayCellBlock } from "@/server/availability";
 import type { CrewAvailabilityRow } from "@/server/availability-grid";
 import { parseIsoDateUtc, toIsoDate } from "@/server/availability-rules";
 
@@ -26,7 +26,18 @@ type AvailabilityGridProps = {
   shoots: ShootFilterOption[];
 };
 
-const DAY_COLUMN_WIDTH_PX = 36; // matches the w-9 date column below
+const DAY_COLUMN_WIDTH_PX = 20;
+
+type DayVerdict = "hard" | "soft" | "free";
+
+function verdictFor(blocks: DayCellBlock[]): DayVerdict {
+  if (blocks.some((b) => b.blockType === "hard")) return "hard";
+  if (blocks.some((b) => b.blockType === "soft")) return "soft";
+  return "free";
+}
+
+const VERDICT_BG: Record<DayVerdict, string> = { hard: "bg-burgundy", soft: "bg-terracotta", free: "bg-cream-deep" };
+const VERDICT_LABEL: Record<DayVerdict, string> = { hard: "Hard blocked", soft: "Soft blocked", free: "Free" };
 
 function allDatesInRange(startIso: string, endIso: string) {
   const dates: string[] = [];
@@ -53,16 +64,14 @@ function groupByMonth(dates: string[]) {
   return groups;
 }
 
-function Swatch({ tier }: { tier: Tier | null }) {
-  return (
-    <div className={cn("h-3 w-full", tier ? TIER_BG[tier] : "border border-dashed border-hairline bg-cream-deep")} />
-  );
+function Swatch({ verdict }: { verdict: DayVerdict }) {
+  return <div className={cn("h-3 w-full", verdict === "free" ? "border border-dashed border-hairline" : VERDICT_BG[verdict])} />;
 }
 
 export function AvailabilityGrid({ crew, windowStart, windowEnd, requiredMembershipIds, shoots }: AvailabilityGridProps) {
   const fullWindowDates = useMemo(() => allDatesInRange(windowStart, windowEnd), [windowStart, windowEnd]);
   const [visibleIds, setVisibleIds] = useState<Set<string>>(() => new Set(crew.map((c) => c.membershipId)));
-  const [activeCell, setActiveCell] = useState<{ dateIso: string; halfDay: "AM" | "PM" } | null>(null);
+  const [activeDate, setActiveDate] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [selectedShootId, setSelectedShootId] = useState<string>("");
 
@@ -104,31 +113,24 @@ export function AvailabilityGrid({ crew, windowStart, windowEnd, requiredMembers
   );
 
   const dayLookup = useMemo(() => {
-    const map = new Map<string, Map<string, { am: Tier | null; pm: Tier | null }>>();
+    const map = new Map<string, Map<string, DayCellBlock[]>>();
     for (const row of crew) {
-      const byDate = new Map<string, { am: Tier | null; pm: Tier | null }>();
-      for (const day of row.days) {
-        byDate.set(day.dateIso, { am: day.am?.tier ?? null, pm: day.pm?.tier ?? null });
-      }
+      const byDate = new Map<string, DayCellBlock[]>();
+      for (const day of row.days) byDate.set(day.dateIso, day.blocks);
       map.set(row.membershipId, byDate);
     }
     return map;
   }, [crew]);
 
   const breakdown = useMemo(() => {
-    if (!activeCell) return null;
-    const groups: Record<"best" | "ok" | "unavailable" | "unknown", string[]> = {
-      best: [],
-      ok: [],
-      unavailable: [],
-      unknown: [],
-    };
+    if (!activeDate) return null;
+    const groups: Record<DayVerdict, string[]> = { hard: [], soft: [], free: [] };
     for (const row of visibleCrew) {
-      const tier = dayLookup.get(row.membershipId)?.get(activeCell.dateIso)?.[activeCell.halfDay === "AM" ? "am" : "pm"];
-      groups[tier ?? "unknown"].push(row.name);
+      const blocks = dayLookup.get(row.membershipId)?.get(activeDate) ?? [];
+      groups[verdictFor(blocks)].push(row.name);
     }
     return groups;
-  }, [activeCell, visibleCrew, dayLookup]);
+  }, [activeDate, visibleCrew, dayLookup]);
 
   return (
     <div>
@@ -206,28 +208,14 @@ export function AvailabilityGrid({ crew, windowStart, windowEnd, requiredMembers
               {dates.map((dateIso) => {
                 const date = parseIsoDateUtc(dateIso);
                 return (
-                  <div key={dateIso} className="w-9 shrink-0 text-center">
+                  <div key={dateIso} className="shrink-0 text-center" style={{ width: DAY_COLUMN_WIDTH_PX }}>
                     <p className="font-mono text-[9px] text-ink-soft">{date.getUTCDate()}</p>
-                    <div className="flex flex-col gap-[1px]">
-                      <button
-                        type="button"
-                        onClick={() => setActiveCell({ dateIso, halfDay: "AM" })}
-                        aria-label={`${dateIso} morning breakdown`}
-                        className={cn(
-                          "h-2 w-full",
-                          activeCell?.dateIso === dateIso && activeCell.halfDay === "AM" && "ring-1 ring-ink",
-                        )}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setActiveCell({ dateIso, halfDay: "PM" })}
-                        aria-label={`${dateIso} afternoon breakdown`}
-                        className={cn(
-                          "h-2 w-full",
-                          activeCell?.dateIso === dateIso && activeCell.halfDay === "PM" && "ring-1 ring-ink",
-                        )}
-                      />
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveDate(dateIso)}
+                      aria-label={`${dateIso} breakdown`}
+                      className={cn("h-2 w-full", activeDate === dateIso && "ring-1 ring-ink")}
+                    />
                   </div>
                 );
               })}
@@ -253,47 +241,42 @@ export function AvailabilityGrid({ crew, windowStart, windowEnd, requiredMembers
                   </span>
                   <span className="truncate text-[12px] font-medium">{row.name}</span>
                 </div>
-                {dates.map((dateIso) => {
-                  const cell = dayLookup.get(row.membershipId)?.get(dateIso);
-                  return (
-                    <div key={dateIso} className="flex w-9 shrink-0 flex-col gap-[1px] px-[1px]">
-                      <Swatch tier={cell?.am ?? null} />
-                      <Swatch tier={cell?.pm ?? null} />
-                    </div>
-                  );
-                })}
+                {dates.map((dateIso) => (
+                  <div key={dateIso} className="shrink-0 px-[1px]" style={{ width: DAY_COLUMN_WIDTH_PX }}>
+                    <Swatch verdict={verdictFor(dayLookup.get(row.membershipId)?.get(dateIso) ?? [])} />
+                  </div>
+                ))}
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {activeCell && breakdown && (
+      {activeDate && breakdown && (
         <div className="mt-6 rounded-md border border-hairline bg-white p-4">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-[12.5px] font-semibold">
-              {parseIsoDateUtc(activeCell.dateIso).toLocaleDateString("en-US", {
+              {parseIsoDateUtc(activeDate).toLocaleDateString("en-US", {
                 weekday: "long",
                 month: "long",
                 day: "numeric",
                 timeZone: "UTC",
-              })}{" "}
-              · {activeCell.halfDay === "AM" ? "Morning" : "Afternoon"}
+              })}
             </p>
-            <button type="button" onClick={() => setActiveCell(null)} className="text-[12px] text-ink-soft">
+            <button type="button" onClick={() => setActiveDate(null)} className="text-[12px] text-ink-soft">
               Close
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            {(["best", "ok", "unavailable", "unknown"] as const).map((tier) => (
-              <div key={tier}>
+          <div className="grid grid-cols-3 gap-4">
+            {(["free", "soft", "hard"] as const).map((verdict) => (
+              <div key={verdict}>
                 <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">
-                  {tier === "unknown" ? "Unknown" : TIER_LABEL[tier]} ({breakdown[tier].length})
+                  {VERDICT_LABEL[verdict]} ({breakdown[verdict].length})
                 </p>
-                {breakdown[tier].length === 0 ? (
+                {breakdown[verdict].length === 0 ? (
                   <p className="text-[11px] italic text-ink-faint">None</p>
                 ) : (
-                  breakdown[tier].map((name) => (
+                  breakdown[verdict].map((name) => (
                     <p key={name} className="text-[12px]">
                       {name}
                     </p>

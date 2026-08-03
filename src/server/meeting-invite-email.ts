@@ -11,7 +11,6 @@ import {
 import { toIsoDate } from "@/server/availability-rules";
 import { canNudgeInvite, resolveEffectiveTime } from "@/server/invite-roster";
 import { isInviteTokenExpired } from "@/server/invite-token";
-import { HALF_DAY_LABEL } from "@/lib/half-day";
 
 function appBaseUrl() {
   return process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
@@ -23,20 +22,20 @@ async function loadInviteForEmail(inviteId: string) {
     include: {
       membership: { include: { user: { select: { name: true, email: true } } } },
       startTimeOverride: true,
-      meeting: { include: { days: { orderBy: [{ date: "asc" }, { halfDay: "asc" }] } } },
+      meeting: { include: { days: { orderBy: { date: "asc" } } } },
     },
   });
 }
 
 function icsDaysFor(
-  days: { id: string; date: Date; halfDay: "AM" | "PM"; defaultStartTime: string }[],
+  days: { id: string; date: Date; estimatedEndTime: string; defaultStartTime: string }[],
   overridesByDayId: Map<string, string>,
 ): IcsEventDay[] {
   return days.map((d) => ({
     id: d.id,
     dateIso: toIsoDate(d.date),
-    halfDay: d.halfDay,
     startTime: resolveEffectiveTime(d.defaultStartTime, overridesByDayId.get(d.id)),
+    estimatedEndTime: d.estimatedEndTime,
   }));
 }
 
@@ -52,7 +51,6 @@ export async function sendInviteEmail(inviteId: string) {
 
   const days: InviteEmailDay[] = invite.meeting.days.map((d) => ({
     dateLabel: toIsoDate(d.date),
-    halfDayLabel: HALF_DAY_LABEL[d.halfDay],
     time: resolveEffectiveTime(d.defaultStartTime, overridesByDayId.get(d.id)),
   }));
 
@@ -124,7 +122,7 @@ export async function notifyConfirmedMeetingChange(meetingId: string, changes: C
   const meeting = await prisma.meeting.update({
     where: { id: meetingId },
     data: { icsSequence: { increment: 1 } },
-    include: { days: { orderBy: [{ date: "asc" }, { halfDay: "asc" }] } },
+    include: { days: { orderBy: { date: "asc" } } },
   });
 
   const activeSlots = await prisma.meetingSlot.findMany({

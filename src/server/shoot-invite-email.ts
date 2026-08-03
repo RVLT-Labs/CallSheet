@@ -11,7 +11,6 @@ import {
 import { toIsoDate } from "@/server/availability-rules";
 import { canNudgeInvite, resolveEffectiveTime } from "@/server/invite-roster";
 import { isInviteTokenExpired } from "@/server/invite-token";
-import { HALF_DAY_LABEL } from "@/lib/half-day";
 
 function appBaseUrl() {
   return process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
@@ -23,20 +22,20 @@ async function loadInviteForEmail(inviteId: string) {
     include: {
       membership: { include: { user: { select: { name: true, email: true } } } },
       callTimeOverride: true,
-      shoot: { include: { days: { orderBy: [{ date: "asc" }, { halfDay: "asc" }] } } },
+      shoot: { include: { days: { orderBy: { date: "asc" } } } },
     },
   });
 }
 
 function icsDaysFor(
-  days: { id: string; date: Date; halfDay: "AM" | "PM"; defaultCallTime: string }[],
+  days: { id: string; date: Date; estimatedEndTime: string; defaultCallTime: string }[],
   overridesByDayId: Map<string, string>,
 ): IcsEventDay[] {
   return days.map((d) => ({
     id: d.id,
     dateIso: toIsoDate(d.date),
-    halfDay: d.halfDay,
     startTime: resolveEffectiveTime(d.defaultCallTime, overridesByDayId.get(d.id)),
+    estimatedEndTime: d.estimatedEndTime,
   }));
 }
 
@@ -53,7 +52,6 @@ export async function sendInviteEmail(inviteId: string) {
 
   const days: InviteEmailDay[] = invite.shoot.days.map((d) => ({
     dateLabel: toIsoDate(d.date),
-    halfDayLabel: HALF_DAY_LABEL[d.halfDay],
     time: resolveEffectiveTime(d.defaultCallTime, overridesByDayId.get(d.id)),
   }));
 
@@ -125,7 +123,7 @@ export async function notifyConfirmedShootChange(shootId: string, changes: Chang
   const shoot = await prisma.shoot.update({
     where: { id: shootId },
     data: { icsSequence: { increment: 1 } },
-    include: { days: { orderBy: [{ date: "asc" }, { halfDay: "asc" }] } },
+    include: { days: { orderBy: { date: "asc" } } },
   });
 
   const activeSlots = await prisma.shootSlot.findMany({

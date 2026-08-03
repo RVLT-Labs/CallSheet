@@ -55,7 +55,8 @@ export default async function ShootDetailPage({ params }: { params: Promise<{ id
     days: shoot.days.map((d) => ({
       id: d.id,
       dateIso: toIsoDate(d.date),
-      halfDay: d.halfDay,
+      startTime: d.startTime,
+      estimatedEndTime: d.estimatedEndTime,
       defaultCallTime: d.defaultCallTime,
     })),
     activeSlots: activeSlots.map((s) => ({

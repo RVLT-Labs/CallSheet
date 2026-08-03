@@ -12,7 +12,7 @@ const baseInput = {
   locationNotes: "Parking around back",
   icsUid: "shoot-abc",
   icsSequence: 0,
-  days: [{ id: "day-1", dateIso: "2026-08-05", halfDay: "AM" as const, startTime: "08:00" }],
+  days: [{ id: "day-1", dateIso: "2026-08-05", startTime: "08:00", estimatedEndTime: "16:00" }],
 };
 
 describe("buildInviteIcs", () => {

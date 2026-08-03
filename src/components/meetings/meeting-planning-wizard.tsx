@@ -9,9 +9,15 @@ import { OptGroup } from "@/components/ui/opt-group";
 import { PillRow } from "@/components/ui/pill-row";
 import { StatusDot } from "@/components/ui/status-dot";
 import { TextField } from "@/components/ui/text-field";
-import { TIER_LABEL, type Tier } from "@/lib/availability-tiers";
 import { confirmMeeting, suggestDates } from "@/app/meetings/new/actions";
-import type { HalfDayPreference, RankedCandidate } from "@/server/scheduling-suggestions";
+import type { DayStatus, DayWindow, RankedCandidate } from "@/server/scheduling-suggestions";
+
+const STATUS_LABEL: Record<DayStatus, string> = { clear: "Clear", flagged: "Possible conflict", hard: "Blocked" };
+const STATUS_TONE: Record<DayStatus, "forest" | "terracotta" | "burgundy"> = {
+  clear: "forest",
+  flagged: "terracotta",
+  hard: "burgundy",
+};
 
 type Step = 1 | 2 | 3 | 4;
 type CrewState = "off" | "general" | "required";
@@ -37,12 +43,6 @@ const CREW_STATE_OPTIONS = [
   { value: "required" as const, label: "Required", tone: "burgundy" as const },
 ];
 
-const TIER_TONE: Record<Tier, "forest" | "terracotta" | "burgundy"> = {
-  best: "forest",
-  ok: "terracotta",
-  unavailable: "burgundy",
-};
-
 export function MeetingPlanningWizard({
   crew,
   windowStart,
@@ -64,10 +64,9 @@ export function MeetingPlanningWizard({
 
   const [dayMode, setDayMode] = useState<"single" | "multi">("single");
   const [numDays, setNumDays] = useState(2);
-  const [halfDayPreference, setHalfDayPreference] = useState<HalfDayPreference>("EITHER");
+  const [dayWindow, setDayWindow] = useState<DayWindow>({ startTime: "08:00", endTime: "09:00" });
   const [searchStart, setSearchStart] = useState(windowStart);
   const [searchEnd, setSearchEnd] = useState(windowEnd);
-  const [defaultStartTime, setDefaultStartTime] = useState("08:00");
 
   const [candidates, setCandidates] = useState<RankedCandidate[] | null>(null);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
@@ -105,7 +104,7 @@ export function MeetingPlanningWizard({
         required: { membershipIds: requiredMembershipIds, placeholderLabels: requiredPlaceholders },
         general: { membershipIds: generalMembershipIds, placeholderLabels: generalPlaceholders },
         numDays: dayMode === "single" ? 1 : numDays,
-        halfDayPreference,
+        dayWindow,
         searchStart,
         searchEnd,
       });
@@ -128,8 +127,7 @@ export function MeetingPlanningWizard({
       const meeting = await confirmMeeting({
         status,
         dayIsos: candidate.dayIsos,
-        halfDayPreference,
-        defaultStartTime,
+        dayWindow,
         required: { membershipIds: requiredMembershipIds, placeholderLabels: requiredPlaceholders },
         general: { membershipIds: generalMembershipIds, placeholderLabels: generalPlaceholders },
       });
@@ -252,17 +250,19 @@ export function MeetingPlanningWizard({
           )}
         </div>
 
-        <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Half-day</p>
-        <div className="mb-5">
-          <PillRow
-            aria-label="Half-day preference"
-            value={halfDayPreference}
-            onChange={setHalfDayPreference}
-            options={[
-              { value: "AM", label: "Morning" },
-              { value: "PM", label: "Afternoon" },
-              { value: "EITHER", label: "Full day" },
-            ]}
+        <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-ink-soft">Start &amp; estimated end time</p>
+        <div className="mb-5 grid grid-cols-2 gap-3.5">
+          <TextField
+            label="Start time"
+            type="time"
+            value={dayWindow.startTime}
+            onChange={(e) => setDayWindow((prev) => ({ ...prev, startTime: e.target.value }))}
+          />
+          <TextField
+            label="Estimated end time"
+            type="time"
+            value={dayWindow.endTime}
+            onChange={(e) => setDayWindow((prev) => ({ ...prev, endTime: e.target.value }))}
           />
         </div>
 
@@ -284,13 +284,6 @@ export function MeetingPlanningWizard({
             onChange={(e) => setSearchEnd(e.target.value)}
           />
         </div>
-
-        <TextField
-          label="Default start time"
-          type="time"
-          value={defaultStartTime}
-          onChange={(e) => setDefaultStartTime(e.target.value)}
-        />
 
         {suggestError && <p className="mb-3 text-[12.5px] text-burgundy">{suggestError}</p>}
 
@@ -346,9 +339,10 @@ export function MeetingPlanningWizard({
                       <span>
                         {b.slot.kind === "member" ? b.slot.name : b.slot.label}{" "}
                         <span className="text-ink-faint">({b.role === "required" ? "Required" : "Optional"})</span>
+                        {b.conflictLabel && <span className="block text-[11px] text-ink-faint">{b.conflictLabel}</span>}
                       </span>
-                      {b.tier ? (
-                        <StatusDot tone={TIER_TONE[b.tier]} label={TIER_LABEL[b.tier]} />
+                      {b.status ? (
+                        <StatusDot tone={STATUS_TONE[b.status]} label={STATUS_LABEL[b.status]} />
                       ) : (
                         <span className="text-ink-faint">
                           {b.slot.kind === "placeholder" ? "Placeholder" : "Unknown"}
@@ -357,6 +351,10 @@ export function MeetingPlanningWizard({
                     </div>
                   ))}
                 </div>
+              )}
+
+              {candidate.hasConflict && (
+                <p className="mt-1.5 text-[11px] text-terracotta">Possible conflict — may still be workable</p>
               )}
 
               <button
@@ -400,8 +398,7 @@ export function MeetingPlanningWizard({
               : `${selected.dayIsos[0]} – ${selected.dayIsos[selected.dayIsos.length - 1]}`}
           </p>
           <p className="text-[12px] text-ink-soft">
-            {halfDayPreference === "EITHER" ? "Full day" : halfDayPreference === "AM" ? "Morning" : "Afternoon"} ·
-            Start {defaultStartTime}
+            Start {dayWindow.startTime} · Est. end {dayWindow.endTime}
           </p>
           <p className="mt-2 text-[12px] text-ink-soft">
             {requiredMembershipIds.length + requiredPlaceholders.length} required ·{" "}

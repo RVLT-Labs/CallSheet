@@ -5,7 +5,6 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { StatusDot } from "@/components/ui/status-dot";
-import { HALF_DAY_LABEL } from "@/lib/half-day";
 import { canNudgeInvite, inviteStatusLabel, type InviteResponseSource, type InviteStatus } from "@/server/invite-roster";
 
 import {
@@ -38,7 +37,7 @@ type PersonSheetProps = {
     lastReminderSentAt: string | null;
     overrides: { shootDayId: string; callTime: string }[];
   } | null;
-  days: { id: string; dateIso: string; halfDay: "AM" | "PM"; defaultCallTime: string }[];
+  days: { id: string; dateIso: string; startTime: string; estimatedEndTime: string; defaultCallTime: string }[];
   isOrganiser: boolean;
   onClose: () => void;
 };
@@ -94,7 +93,7 @@ export function PersonSheet({ shootId, memberName, invite, days, isOrganiser, on
       {days.map((day) => (
         <div key={day.id} className="mb-3 flex items-center justify-between gap-3">
           <span className="text-[12.5px] text-ink-soft">
-            {day.dateIso} · {HALF_DAY_LABEL[day.halfDay]}
+            {day.dateIso} · {day.startTime}–{day.estimatedEndTime}
           </span>
           {isOrganiser ? (
             <input

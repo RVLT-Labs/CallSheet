@@ -148,6 +148,7 @@ model Member {
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   availability             Availability[]
+  availabilityDateOverrides AvailabilityDateOverride[]
   recurringRules           RecurringAvailabilityRule[]
   shootInvites             ShootInvite[]
   overriddenInvites        ShootInvite[]               @relation("InviteOverriddenBy")
@@ -181,17 +182,11 @@ model Invitation {
   @@map("invitation")
 }
 
-// ---------- Availability (spec §4.3, §6) ----------
+// ---------- Availability (timed soft/hard blocks — pivoted from AM/PM tiers, issue #70) ----------
 
-enum HalfDay {
-  AM
-  PM
-}
-
-enum AvailabilityTier {
-  best
-  ok
-  unavailable
+enum BlockType {
+  soft // flexible/movable — never hard-gates a required person out of a suggested date
+  hard // can't move it — hard-gates a required person out of a suggested date, like the old "Unavailable"
 }
 
 enum AvailabilitySource {
@@ -199,12 +194,19 @@ enum AvailabilitySource {
   recurring
 }
 
+// A block is a range of time a crew member is NOT free, not a whole-day tier.
+// Default assumption with no blocks on a date is "available all day" (spec §10
+// pivot). Multiple blocks can coexist on the same date (e.g. two separate
+// obligations), so there's no unique key on (membershipId, date) the way the
+// old tier model had on (membershipId, date, halfDay).
 model Availability {
   id           String             @id @default(cuid())
   membershipId String
   date         DateTime           @db.Date
-  halfDay      HalfDay
-  tier         AvailabilityTier
+  startTime    String // "HH:mm"
+  endTime      String // "HH:mm"
+  blockType    BlockType
+  label        String? // e.g. "Waitressing shift"
   source       AvailabilitySource @default(manual)
   sourceRuleId String? // which RecurringAvailabilityRule generated this row, when source = recurring
   createdAt    DateTime           @default(now())
@@ -213,25 +215,46 @@ model Availability {
   membership Member                     @relation(fields: [membershipId], references: [id], onDelete: Cascade)
   sourceRule RecurringAvailabilityRule? @relation(fields: [sourceRuleId], references: [id], onDelete: SetNull)
 
-  // one tier per person/date/half-day — manual entries overwrite in place rather than stacking rows
-  @@unique([membershipId, date, halfDay])
-  @@index([membershipId])
+  // A rule matches a given date at most once (day-of-week is unambiguous), so this
+  // is a real uniqueness constraint for recurring rows; Postgres treats NULL
+  // sourceRuleId (manual rows) as always distinct, so it never constrains those.
+  @@unique([membershipId, date, sourceRuleId])
+  @@index([membershipId, date])
   @@index([sourceRuleId])
 }
 
+// Marks a date as manually managed so recurring-rule generation skips it
+// entirely, even when the crew member has cleared every block for that date
+// (spec §10: manual always overrides recurring, including "I'm actually free"
+// on a day a recurring rule would otherwise block). Only needed for that
+// zero-manual-blocks case — a date with at least one manual Availability row
+// already suppresses recurring generation on its own (see resolveAvailabilityWindow).
+model AvailabilityDateOverride {
+  id           String   @id @default(cuid())
+  membershipId String
+  date         DateTime @db.Date
+  createdAt    DateTime @default(now())
+
+  membership Member @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipId, date])
+}
+
 // A recurring rule generates/refreshes Availability rows with source = recurring.
-// A manual Availability row on a matching date always takes precedence (spec §10).
+// A manual Availability row (or an AvailabilityDateOverride marker) on a
+// matching date always takes precedence (spec §10).
 model RecurringAvailabilityRule {
-  id             String           @id @default(cuid())
+  id             String    @id @default(cuid())
   membershipId   String
   dayOfWeek      Int // 0 (Sunday) - 6 (Saturday)
-  halfDay        HalfDay? // null = both AM and PM
-  tier           AvailabilityTier
+  startTime      String // "HH:mm"
+  endTime        String // "HH:mm"
+  blockType      BlockType
   label          String?
-  effectiveStart DateTime         @db.Date
-  effectiveEnd   DateTime?        @db.Date // defaults to the film's working window when unset
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  effectiveStart DateTime  @db.Date
+  effectiveEnd   DateTime? @db.Date // defaults to the film's working window when unset
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   membership            Member         @relation(fields: [membershipId], references: [id], onDelete: Cascade)
   generatedAvailability Availability[]
@@ -272,16 +295,17 @@ model Shoot {
 }
 
 model ShootDay {
-  id              String   @id @default(cuid())
-  shootId         String
-  date            DateTime @db.Date
-  halfDay         HalfDay
-  defaultCallTime String // "HH:mm", kept as a plain string — no timezone math needed within one shoot's local call time
+  id               String   @id @default(cuid())
+  shootId          String
+  date             DateTime @db.Date
+  startTime        String // "HH:mm" — the shoot's actual start time this day; matched against crew blocks by the suggestion algorithm
+  estimatedEndTime String // "HH:mm"
+  defaultCallTime  String // "HH:mm", kept as a plain string — no timezone math needed within one shoot's local call time; can be earlier than startTime
 
   shoot            Shoot              @relation(fields: [shootId], references: [id], onDelete: Cascade)
   callTimeOverride CallTimeOverride[]
 
-  @@unique([shootId, date, halfDay])
+  @@unique([shootId, date])
 }
 
 enum ShootSlotKind {
@@ -398,13 +422,13 @@ model MeetingDay {
   id               String   @id @default(cuid())
   meetingId        String
   date             DateTime @db.Date
-  halfDay          HalfDay
-  defaultStartTime String // "HH:mm"
+  defaultStartTime String // "HH:mm" — the meeting's actual start time; matched against crew blocks by the suggestion algorithm
+  estimatedEndTime String // "HH:mm"
 
-  meeting               Meeting                @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  meeting           Meeting                   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
   startTimeOverride MeetingCallTimeOverride[]
 
-  @@unique([meetingId, date, halfDay])
+  @@unique([meetingId, date])
 }
 
 enum MeetingSlotKind {

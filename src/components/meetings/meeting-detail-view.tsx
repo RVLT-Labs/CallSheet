@@ -10,7 +10,6 @@ import { RequiredMarker, StatusDot } from "@/components/ui/status-dot";
 import { Sheet } from "@/components/ui/sheet";
 import { TextField } from "@/components/ui/text-field";
 import { TextAreaField } from "@/components/ui/textarea-field";
-import { HALF_DAY_LABEL } from "@/lib/half-day";
 import { countRsvpStatuses, inviteStatusLabel, type InviteResponseSource, type InviteStatus } from "@/server/invite-roster";
 import { LocationMap } from "@/components/location/location-map";
 import { LocationPicker, type LocationFields } from "@/components/location/location-picker";
@@ -32,7 +31,7 @@ export type MeetingDetailData = {
   locationMapUrl: string | null;
   locationNotes: string | null;
   dayIsos: string[];
-  days: { id: string; dateIso: string; halfDay: "AM" | "PM"; defaultStartTime: string }[];
+  days: { id: string; dateIso: string; defaultStartTime: string; estimatedEndTime: string }[];
   activeSlots: {
     id: string;
     kind: "required" | "general";
@@ -282,7 +281,7 @@ function EditDetailsForm({ meeting, onSaved }: { meeting: MeetingDetailData; onS
           {meeting.days.map((day) => (
             <div key={day.id} className="mb-2 flex items-center justify-between gap-3">
               <span className="text-[12.5px] text-ink-soft">
-                {day.dateIso} · {HALF_DAY_LABEL[day.halfDay]}
+                {day.dateIso} · {day.defaultStartTime}–{day.estimatedEndTime}
               </span>
               <input
                 type="time"

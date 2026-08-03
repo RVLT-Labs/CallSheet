@@ -1,10 +1,9 @@
 import { randomBytes } from "crypto";
 
 import { prisma } from "@/lib/prisma";
-import type { Tier } from "@/lib/availability-tiers";
-import { HALF_DAY_LABEL } from "@/lib/half-day";
 import { getAvailabilityCalendarDataBatch } from "@/server/availability";
 import { toIsoDate } from "@/server/availability-rules";
+import { dayStatus } from "@/server/scheduling-suggestions";
 import { removalOutcomeForInvite, shouldNotifyConfirmedEventChange, type InviteStatus } from "@/server/invite-roster";
 import { notifyConfirmedMeetingChange, sendInviteEmail, sendReminderEmail } from "@/server/meeting-invite-email";
 import type { ChangeField } from "@/lib/email-templates";
@@ -13,7 +12,7 @@ export async function getMeetingDetail(meetingId: string, organizationId: string
   const meeting = await prisma.meeting.findFirst({
     where: { id: meetingId, filmId: organizationId },
     include: {
-      days: { orderBy: [{ date: "asc" }, { halfDay: "asc" }] },
+      days: { orderBy: { date: "asc" } },
       slots: {
         include: { membership: { include: { user: { select: { name: true, email: true } } } } },
         orderBy: { id: "asc" },
@@ -136,7 +135,7 @@ export async function updateMeetingDetails(
       if (!day || day.defaultStartTime === defaultStartTime) continue;
 
       changes.push({
-        label: `${toIsoDate(day.date)} ${HALF_DAY_LABEL[day.halfDay]} start time`,
+        label: `${toIsoDate(day.date)} start time`,
         oldValue: day.defaultStartTime,
         newValue: defaultStartTime,
       });
@@ -222,23 +221,15 @@ export async function setStartTimeOverride(inviteId: string, meetingDayId: strin
   });
 }
 
-// Same value scale as scheduling-suggestions.ts's worst-day rule — unknown is
-// a light penalty between OK and Unavailable, never treated as a red flag.
-const TIER_VALUE: Record<Tier, number> = { best: 1, ok: 0.6, unavailable: 0 };
-const UNKNOWN_VALUE = 0.4;
-
-function tierValue(tier: Tier | null) {
-  return tier === null ? UNKNOWN_VALUE : TIER_VALUE[tier];
-}
-
 /**
  * Availability ratio only, no roster — a Tentative meeting has no invites
  * yet. Mirrors the suggestion algorithm's worst-day rule for a person
- * spanning multiple days of this meeting.
+ * spanning multiple days of this meeting: a hard block overlapping any day
+ * means "not available" for the ratio; a soft block or no block still counts.
  */
 export async function getTentativeAvailabilityRatio(meeting: {
   id: string;
-  days: { date: Date; halfDay: "AM" | "PM" }[];
+  days: { date: Date; defaultStartTime: string; estimatedEndTime: string }[];
   slots: { membershipId: string | null; removedAt: Date | null }[];
 }) {
   const membershipIds = [
@@ -257,18 +248,15 @@ export async function getTentativeAvailabilityRatio(meeting: {
     const days = calendarByMembership.get(membershipId)?.days ?? [];
     const byDate = new Map(days.map((d) => [d.dateIso, d]));
 
-    let worstTier: Tier | null = null;
-    let worstValue = Infinity;
-    for (const meetingDay of meeting.days) {
+    const isAvailable = meeting.days.every((meetingDay) => {
       const cell = byDate.get(toIsoDate(meetingDay.date));
-      const tier = meetingDay.halfDay === "AM" ? (cell?.am?.tier ?? null) : (cell?.pm?.tier ?? null);
-      const value = tierValue(tier);
-      if (value < worstValue) {
-        worstValue = value;
-        worstTier = tier;
-      }
-    }
-    if (worstTier === "best" || worstTier === "ok") availableCount++;
+      const status = dayStatus(cell?.blocks ?? [], {
+        startTime: meetingDay.defaultStartTime,
+        endTime: meetingDay.estimatedEndTime,
+      });
+      return status !== "hard";
+    });
+    if (isAvailable) availableCount++;
   }
 
   return { availableCount, totalCount: membershipIds.length };
